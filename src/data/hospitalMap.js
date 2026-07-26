@@ -1,34 +1,70 @@
-const WALL_HEIGHT = 2;
+const WALL_HEIGHT = 2.5;
 
-// Standardized architectural components to ensure structural consistency across floors
-const getOuterWalls = () => [
-  { pos: [0, WALL_HEIGHT/2, -10], size: [20.5, WALL_HEIGHT, 0.5] }, // Top
-  { pos: [0, WALL_HEIGHT/2, 10], size: [20.5, WALL_HEIGHT, 0.5] },  // Bottom
-  { pos: [-10, WALL_HEIGHT/2, 0], size: [0.5, WALL_HEIGHT, 20] },   // Left
-  { pos: [10, WALL_HEIGHT/2, 0], size: [0.5, WALL_HEIGHT, 20] },    // Right
+function generateRoomWalls(cx, cz, w, d, doorSide) {
+  const walls = [];
+  const thickness = 0.4;
+  const h = WALL_HEIGHT;
+
+  // Top Wall
+  if (doorSide === 'top') {
+    walls.push({ pos: [cx - w/4 - 1, h/2, cz - d/2], size: [w/2 - 2, h, thickness] });
+    walls.push({ pos: [cx + w/4 + 1, h/2, cz - d/2], size: [w/2 - 2, h, thickness] });
+  } else {
+    walls.push({ pos: [cx, h/2, cz - d/2], size: [w, h, thickness] });
+  }
+
+  // Bottom Wall
+  if (doorSide === 'bottom') {
+    walls.push({ pos: [cx - w/4 - 1, h/2, cz + d/2], size: [w/2 - 2, h, thickness] });
+    walls.push({ pos: [cx + w/4 + 1, h/2, cz + d/2], size: [w/2 - 2, h, thickness] });
+  } else {
+    walls.push({ pos: [cx, h/2, cz + d/2], size: [w, h, thickness] });
+  }
+
+  // Left Wall
+  if (doorSide === 'left') {
+    walls.push({ pos: [cx - w/2, h/2, cz - d/4 - 1], size: [thickness, h, d/2 - 2] });
+    walls.push({ pos: [cx + w/2, h/2, cz + d/4 + 1], size: [thickness, h, d/2 - 2] }); // Bug fix: cx - w/2
+  } else {
+    walls.push({ pos: [cx - w/2, h/2, cz], size: [thickness, h, d] });
+  }
+  // Left wall Bug fix applied:
+  if (doorSide === 'left') {
+    walls[walls.length-1].pos = [cx - w/2, h/2, cz + d/4 + 1];
+    walls[walls.length-2].pos = [cx - w/2, h/2, cz - d/4 - 1];
+  }
+
+  // Right Wall
+  if (doorSide === 'right') {
+    walls.push({ pos: [cx + w/2, h/2, cz - d/4 - 1], size: [thickness, h, d/2 - 2] });
+    walls.push({ pos: [cx + w/2, h/2, cz + d/4 + 1], size: [thickness, h, d/2 - 2] });
+  } else {
+    walls.push({ pos: [cx + w/2, h/2, cz], size: [thickness, h, d] });
+  }
+
+  return walls;
+}
+
+// Generate the standard H-shape architecture walls
+const hShapeWalls = [
+  ...generateRoomWalls(-20.5, -8.5, 9, 14, 'right'),  // TL_West
+  ...generateRoomWalls(-9.5, -8.5, 9, 14, 'left'),    // TR_West
+  ...generateRoomWalls(-20.5, 8.5, 9, 14, 'right'),   // BL_West
+  ...generateRoomWalls(-9.5, 8.5, 9, 14, 'left'),     // BR_West
+  
+  ...generateRoomWalls(9.5, -8.5, 9, 14, 'right'),    // TL_East
+  ...generateRoomWalls(20.5, -8.5, 9, 14, 'left'),    // TR_East
+  ...generateRoomWalls(9.5, 8.5, 9, 14, 'right'),     // BL_East
+  ...generateRoomWalls(20.5, 8.5, 9, 14, 'left'),     // BR_East
+
+  ...generateRoomWalls(0, -5, 10, 7, 'bottom'),       // Top_Hub
+  ...generateRoomWalls(0, 5, 10, 7, 'top'),           // Bottom_Hub
 ];
 
-const getCorridorWalls = () => [
-  // Top Corridor Wall (with gaps for doors)
-  { pos: [-6.5, WALL_HEIGHT/2, -1.5], size: [6.5, WALL_HEIGHT, 0.5] },
-  { pos: [0, WALL_HEIGHT/2, -1.5], size: [2.5, WALL_HEIGHT, 0.5] },
-  { pos: [6.5, WALL_HEIGHT/2, -1.5], size: [6.5, WALL_HEIGHT, 0.5] },
-
-  // Bottom Corridor Wall (with gaps for doors)
-  { pos: [-6.5, WALL_HEIGHT/2, 1.5], size: [6.5, WALL_HEIGHT, 0.5] },
-  { pos: [0, WALL_HEIGHT/2, 1.5], size: [2.5, WALL_HEIGHT, 0.5] },
-  { pos: [6.5, WALL_HEIGHT/2, 1.5], size: [6.5, WALL_HEIGHT, 0.5] },
-
-  // Vertical Room Dividers (Top Side)
-  { pos: [-3, WALL_HEIGHT/2, -5.75], size: [0.5, WALL_HEIGHT, 8] },
-  { pos: [3, WALL_HEIGHT/2, -5.75], size: [0.5, WALL_HEIGHT, 8] },
-
-  // Vertical Room Dividers (Bottom Side)
-  { pos: [-3, WALL_HEIGHT/2, 5.75], size: [0.5, WALL_HEIGHT, 8] },
-  { pos: [3, WALL_HEIGHT/2, 5.75], size: [0.5, WALL_HEIGHT, 8] },
-];
-
-const standardWalls = [...getOuterWalls(), ...getCorridorWalls()];
+// Helper to create room objects quickly
+function createRoom(name, cx, cz, w, d, color, props = []) {
+  return { name, pos: [cx, 0.05, cz], size: [w, d], color, props };
+}
 
 export const hospitalLayout = {
   floors: [
@@ -37,72 +73,66 @@ export const hospitalLayout = {
       level: "G",
       name: "Ground Floor",
       description: "Public Access & Emergency",
-      walls: standardWalls,
+      walls: hShapeWalls,
       rooms: [
-        { name: 'Casualty (ER)', pos: [-6.5, 0.05, -5.5], color: '#e74c3c' },
-        { name: 'OP Section', pos: [0, 0.05, -5.5], color: '#3498db' },
-        { name: 'Registration', pos: [6.5, 0.05, -5.5], color: '#9b59b6' },
-        { name: 'Pharmacy', pos: [-6.5, 0.05, 5.5], color: '#2ecc71' },
-        { name: 'Reception', pos: [0, 0.05, 5.5], color: '#f1c40f' },
-        { name: 'Lifts / Stairs', pos: [6.5, 0.05, 5.5], color: '#95a5a6', isLift: true },
+        createRoom('Casualty (ER)', -20.5, -8.5, 9, 14, '#e74c3c', ['beds', 'ivs']),
+        createRoom('Triage', -9.5, -8.5, 9, 14, '#e67e22', ['chairs']),
+        createRoom('Pharmacy', -20.5, 8.5, 9, 14, '#2ecc71', ['cabinets']),
+        createRoom('Consultation A', -9.5, 8.5, 9, 14, '#3498db', ['desks']),
+        
+        createRoom('X-Ray', 9.5, -8.5, 9, 14, '#9b59b6', ['machines']),
+        createRoom('MRI / CT Scan', 20.5, -8.5, 9, 14, '#8e44ad', ['machines']),
+        createRoom('OP Checkup', 9.5, 8.5, 9, 14, '#3498db', ['desks']),
+        createRoom('Cafeteria', 20.5, 8.5, 9, 14, '#f1c40f', ['tables']),
+
+        createRoom('Waiting Lounge', 0, -5, 10, 7, '#ecf0f1', ['chairs', 'plants']),
+        createRoom('Main Reception & Lifts', 0, 5, 10, 7, '#95a5a6', ['reception', 'lifts']),
       ],
-      // Dummy Route for Ground Floor: Reception -> Lifts
-      route: [
-        [0, 0.2, 5.5],
-        [0, 0.2, 1.5],
-        [0, 0.2, 0],
-        [6.5, 0.2, 0],
-        [6.5, 0.2, 1.5],
-        [6.5, 0.2, 5.5]
-      ]
+      route: [[0, 0.2, 5], [0, 0.2, 0], [-15, 0.2, 0], [-15, 0.2, -8.5], [-20.5, 0.2, -8.5]] // Reception to ER
     },
     {
       id: 1,
       level: "F1",
       name: "First Floor",
-      description: "Inpatient Wards & Doctors",
-      walls: standardWalls,
+      description: "Inpatient Wards & Maternity",
+      walls: hShapeWalls,
       rooms: [
-        { name: 'Doctor Office 1', pos: [-6.5, 0.05, -5.5], color: '#ffb8b8' },
-        { name: 'Doctor Office 2', pos: [0, 0.05, -5.5], color: '#ffb8b8' },
-        { name: 'IP Ward A', pos: [6.5, 0.05, -5.5], color: '#a29bfe' },
-        { name: 'Nurse Station', pos: [-6.5, 0.05, 5.5], color: '#55efc4' },
-        { name: 'IP Ward B', pos: [0, 0.05, 5.5], color: '#a29bfe' },
-        { name: 'Lifts / Stairs', pos: [6.5, 0.05, 5.5], color: '#95a5a6', isLift: true },
+        createRoom('Male Ward', -20.5, -8.5, 9, 14, '#a29bfe', ['beds']),
+        createRoom('Female Ward', -9.5, -8.5, 9, 14, '#a29bfe', ['beds']),
+        createRoom('Private Rooms', -20.5, 8.5, 9, 14, '#74b9ff', ['beds', 'chairs']),
+        createRoom('Doctors Lounge', -9.5, 8.5, 9, 14, '#55efc4', ['tables']),
+        
+        createRoom('Maternity Ward', 9.5, -8.5, 9, 14, '#fd79a8', ['beds']),
+        createRoom('NICU (Neonatal)', 20.5, -8.5, 9, 14, '#fab1a0', ['machines']),
+        createRoom('Pediatric Ward', 9.5, 8.5, 9, 14, '#ffeaa7', ['beds']),
+        createRoom('Play Area', 20.5, 8.5, 9, 14, '#55efc4', ['plants', 'chairs']),
+
+        createRoom('Central Nurse Station', 0, -5, 10, 7, '#00b894', ['cabinets', 'desks']),
+        createRoom('Lifts / Transport', 0, 5, 10, 7, '#95a5a6', ['lifts']),
       ],
-      // Dummy Route for First Floor: Lifts -> Nurse Station
-      route: [
-        [6.5, 0.2, 5.5],
-        [6.5, 0.2, 1.5],
-        [6.5, 0.2, 0],
-        [-6.5, 0.2, 0],
-        [-6.5, 0.2, 1.5],
-        [-6.5, 0.2, 5.5]
-      ]
+      route: [[0, 0.2, 5], [0, 0.2, 0], [15, 0.2, 0], [15, 0.2, -8.5], [9.5, 0.2, -8.5]] // Lifts to Maternity
     },
     {
       id: 2,
       level: "F2",
       name: "Second Floor",
-      description: "Critical Care",
-      walls: standardWalls,
+      description: "Surgery & Critical Care",
+      walls: hShapeWalls,
       rooms: [
-        { name: 'Operation Theatre 1', pos: [-6.5, 0.05, -5.5], color: '#ff7675' },
-        { name: 'Operation Theatre 2', pos: [0, 0.05, -5.5], color: '#ff7675' },
-        { name: 'Prep / Scrub', pos: [6.5, 0.05, -5.5], color: '#74b9ff' },
-        { name: 'ICU Ward A', pos: [-6.5, 0.05, 5.5], color: '#fdcb6e' },
-        { name: 'ICU Ward B', pos: [0, 0.05, 5.5], color: '#fdcb6e' },
-        { name: 'Lifts / Stairs', pos: [6.5, 0.05, 5.5], color: '#95a5a6', isLift: true },
+        createRoom('Operation Theatre 1', -20.5, -8.5, 9, 14, '#ff7675', ['machines', 'beds']),
+        createRoom('Operation Theatre 2', -9.5, -8.5, 9, 14, '#ff7675', ['machines', 'beds']),
+        createRoom('Scrub Room', -20.5, 8.5, 9, 14, '#81ecec', ['cabinets']),
+        createRoom('Post-Op Recovery', -9.5, 8.5, 9, 14, '#74b9ff', ['beds']),
+        
+        createRoom('ICU Ward A', 9.5, -8.5, 9, 14, '#fdcb6e', ['beds', 'ivs', 'machines']),
+        createRoom('ICU Ward B', 20.5, -8.5, 9, 14, '#fdcb6e', ['beds', 'ivs', 'machines']),
+        createRoom('Cardiac Care (CCU)', 9.5, 8.5, 9, 14, '#e17055', ['beds', 'machines']),
+        createRoom('Equipment Storage', 20.5, 8.5, 9, 14, '#b2bec3', ['cabinets']),
+
+        createRoom('Relatives Waiting Room', 0, -5, 10, 7, '#ecf0f1', ['chairs']),
+        createRoom('Lifts / Transport', 0, 5, 10, 7, '#95a5a6', ['lifts']),
       ],
-      // Dummy Route for Second Floor: Lifts -> ICU Ward A
-      route: [
-        [6.5, 0.2, 5.5],
-        [6.5, 0.2, 1.5],
-        [6.5, 0.2, 0],
-        [-6.5, 0.2, 0],
-        [-6.5, 0.2, 1.5],
-        [-6.5, 0.2, 5.5]
-      ]
+      route: [[0, 0.2, 5], [0, 0.2, 0], [-15, 0.2, 0], [-15, 0.2, -8.5], [-20.5, 0.2, -8.5]] // Lifts to OT 1
     }
   ]
 };
