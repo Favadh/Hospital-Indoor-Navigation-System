@@ -1,29 +1,27 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Text, Line, Environment } from '@react-three/drei';
-import * as THREE from 'three';
 
-// --- CONSTANTS ---
+// --- CONSTANTS & COORDINATE CONVERSION ---
 const WALL_HEIGHT = 80;
 const WALL_THICKNESS = 8;
 const SVG_W = 1920;
 const SVG_H = 1080;
-const OFFSET_X = -SVG_W / 2; // -960: centers the map at world origin
+const OFFSET_X = -SVG_W / 2; // -960
 const OFFSET_Z = -SVG_H / 2; // -540
 
-// Convert SVG (x,y) to 3D world (x, z)
+// Converts 2D SVG (x, y) coordinates directly to 3D World (x, z) coordinates
 function svgToWorld(sx, sy) {
   return [sx + OFFSET_X, sy + OFFSET_Z];
 }
 
-// Get the center of an SVG bounding box in world space, at a given Y height
-function roomCenter(x1, y1, x2, y2, height = WALL_HEIGHT + 12) {
+// Get center of an SVG bounding box in 3D world space (X, Y_height, Z)
+function roomCenter(x1, y1, x2, y2, height = WALL_HEIGHT + 15) {
   return [(x1 + x2) / 2 + OFFSET_X, height, (y1 + y2) / 2 + OFFSET_Z];
 }
 
 // ============================================================================
-// MANUAL SVG PARSER — Bypasses SVGLoader entirely for 100% accuracy
-// Reads <line stroke="black"> elements directly via DOMParser
+// 3D EXTRUDED WALLS (Direct World Coordinates, 100% Aligned with SVG)
 // ============================================================================
 function ExtrudedWalls() {
   const [walls, setWalls] = useState([]);
@@ -49,15 +47,18 @@ function ExtrudedWalls() {
           const y2 = parseFloat(el.getAttribute('y2'));
 
           const dx = x2 - x1;
-          const dy = y2 - y1;
-          const length = Math.hypot(dx, dy);
-          if (length < 1) return;
+          const dz = y2 - y1;
+          const length = Math.hypot(dx, dz);
+          if (length < 0.5) return;
 
+          // Midpoint in 3D World Coordinates (X, Z)
           const midX = (x1 + x2) / 2 + OFFSET_X;
           const midZ = (y1 + y2) / 2 + OFFSET_Z;
-          const angle = Math.atan2(dy, dx);
 
-          segs.push({ id: id++, length, midX, midZ, angle });
+          // Angle around 3D Y-axis
+          const angleY = -Math.atan2(dz, dx);
+
+          segs.push({ id: id++, length, midX, midZ, angleY });
         });
 
         setWalls(segs);
@@ -65,33 +66,33 @@ function ExtrudedWalls() {
   }, []);
 
   return (
-    <group rotation={[-Math.PI / 2, 0, 0]}>
-      {/* Outer ground plate (slightly larger than building) */}
-      <mesh position={[0, 0, -2]} receiveShadow>
+    <group>
+      {/* Outer Ground Plate */}
+      <mesh position={[0, -2, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[2100, 1300]} />
         <meshStandardMaterial color="#b2bec3" roughness={0.9} />
       </mesh>
 
-      {/* Interior floor matching the grey #D9D9D9 fill from the SVG */}
-      <mesh position={[0, 0, -0.5]} receiveShadow>
+      {/* Interior Floor matching SVG #D9D9D9 fill */}
+      <mesh position={[0, -0.5, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[1840, 1000]} />
         <meshStandardMaterial color="#dfe6e9" roughness={0.85} />
       </mesh>
 
-      {/* All extruded wall segments */}
+      {/* Extruded Architectural Walls */}
       {walls.map((w) => (
         <mesh
           key={w.id}
-          position={[w.midX, w.midZ, WALL_HEIGHT / 2]}
-          rotation={[0, 0, w.angle]}
+          position={[w.midX, WALL_HEIGHT / 2, w.midZ]}
+          rotation={[0, w.angleY, 0]}
           castShadow
           receiveShadow
         >
-          <boxGeometry args={[w.length, WALL_THICKNESS, WALL_HEIGHT]} />
+          <boxGeometry args={[w.length, WALL_HEIGHT, WALL_THICKNESS]} />
           <meshStandardMaterial
-            color="#dcd6cc"
-            roughness={0.3}
-            metalness={0.05}
+            color="#f0ece2"
+            roughness={0.25}
+            metalness={0.08}
           />
         </mesh>
       ))}
@@ -100,43 +101,22 @@ function ExtrudedWalls() {
 }
 
 // ============================================================================
-// DEPARTMENT LABELS — Precisely mapped from SVG bounding boxes + image.png
+// DEPARTMENT LABELS (Matching image.png & Hospital G.svg)
 // ============================================================================
-//
-// Room coordinate tracing from Hospital G.svg lines:
-//
-// Cafeteria:     walls x=40–240,  y=40–438  (left tall room, top half)
-// Toilet:        walls x=239–560, y=40–160  (top row, left)
-// Lift:          walls x=559–681, y=40–160  (top row, small)
-// Stair:         walls x=681–901, y=40–160  (top row, right)
-// Reception:     walls x=239–558, y=275–438 (mid row, left)
-// Registration:  walls x=681–1000,y=275–438 (mid row, right)
-// OT:            walls x=1120–1440,y=40–315 (right block, upper)
-// Lab:           walls x=1120–1440,y=315–590(right block, lower)
-// ICU:           walls x=1560–1880,y=40–241 (far right, top)
-// Recovery Ward: walls x=1560–1880,y=241–480(far right, upper-mid)
-// X-Ray:         walls x=1560–1880,y=480–721(far right, lower-mid)
-// Emergency:     walls x=1560–1880,y=721–961(far right, bottom)
-// Pharmacy:      walls x=40–240,  y=520–959 (left tall room, bottom half)
-// Waiting Area:  walls x=360–880, y=560–880 (large center space)
-// Casuality:     walls x=1000–1440,y=721–961(bottom center)
-// Main Entrance: corridor x=240–880,y=958–1040 (bottom left corridor)
-// Emergency Ent: corridor x=1440–1880,y=958–1040 (bottom right corridor)
-//
 function DepartmentLabels() {
   const departments = [
     // ---- LEFT COLUMN ----
-    { name: "Cafeteria",           pos: roomCenter(40, 40, 240, 438),         color: "#e67e22",  fontSize: 20, vertical: true },
-    { name: "Pharmacy",            pos: roomCenter(40, 520, 240, 959),        color: "#00b894",  fontSize: 20, vertical: true },
+    { name: "Cafeteria",           pos: roomCenter(40, 40, 240, 438),         color: "#e67e22",  fontSize: 22, vertical: true },
+    { name: "Pharmacy",            pos: roomCenter(40, 520, 240, 959),        color: "#00b894",  fontSize: 22, vertical: true },
 
     // ---- TOP ROW ----
-    { name: "Toilet",              pos: roomCenter(239, 40, 560, 160),        color: "#636e72",  fontSize: 20 },
-    { name: "Lift",                pos: roomCenter(559, 40, 681, 160),        color: "#2d3436",  fontSize: 18 },
-    { name: "Stair",               pos: roomCenter(681, 40, 901, 160),        color: "#2d3436",  fontSize: 20 },
+    { name: "Toilet",              pos: roomCenter(239, 40, 560, 160),        color: "#636e72",  fontSize: 22 },
+    { name: "Lift",                pos: roomCenter(559, 40, 681, 160),        color: "#2d3436",  fontSize: 20 },
+    { name: "Stair",               pos: roomCenter(681, 40, 901, 160),        color: "#2d3436",  fontSize: 22 },
 
     // ---- MID ROW ----
-    { name: "Reception",           pos: roomCenter(239, 275, 558, 438),       color: "#6c5ce7",  fontSize: 24, bold: true },
-    { name: "Registration",        pos: roomCenter(681, 275, 1000, 438),      color: "#2d3436",  fontSize: 24, bold: true },
+    { name: "Reception",           pos: roomCenter(239, 275, 558, 438),       color: "#6c5ce7",  fontSize: 26, bold: true },
+    { name: "Registration",        pos: roomCenter(681, 275, 1000, 438),      color: "#2d3436",  fontSize: 26, bold: true },
 
     // ---- RIGHT BLOCK (OT + Lab) ----
     { name: "OT",                  pos: roomCenter(1120, 40, 1440, 315),      color: "#d63031",  fontSize: 30, bold: true },
@@ -144,41 +124,41 @@ function DepartmentLabels() {
 
     // ---- FAR RIGHT WING ----
     { name: "ICU",                 pos: roomCenter(1560, 40, 1880, 241),      color: "#d63031",  fontSize: 28, bold: true },
-    { name: "Recovery Ward",       pos: roomCenter(1560, 241, 1880, 480),     color: "#6c5ce7",  fontSize: 20 },
+    { name: "Recovery Ward",       pos: roomCenter(1560, 241, 1880, 480),     color: "#6c5ce7",  fontSize: 22 },
     { name: "X-Ray",               pos: roomCenter(1560, 480, 1880, 721),     color: "#00b894",  fontSize: 26, bold: true },
-    { name: "Emergency",           pos: roomCenter(1560, 721, 1880, 961),     color: "#ff3838",  fontSize: 24, bold: true },
+    { name: "Emergency",           pos: roomCenter(1560, 721, 1880, 961),     color: "#ff3838",  fontSize: 26, bold: true },
 
     // ---- CENTER SPACE ----
-    { name: "Waiting Area",        pos: roomCenter(360, 560, 880, 880),       color: "#0984e3",  fontSize: 24, bold: true, vertical: true },
+    { name: "Waiting Area",        pos: roomCenter(360, 560, 880, 880),       color: "#0984e3",  fontSize: 26, bold: true, vertical: true },
 
     // ---- BOTTOM ----
-    { name: "Casuality",           pos: roomCenter(1000, 721, 1440, 961),     color: "#e17055",  fontSize: 24, bold: true },
+    { name: "Casuality",           pos: roomCenter(1000, 721, 1440, 961),     color: "#e17055",  fontSize: 26, bold: true },
 
     // ---- BOTTOM CORRIDOR ----
-    { name: "Main Entrance",       pos: roomCenter(240, 958, 880, 1040, 35),  color: "#00cec9",  fontSize: 24, bold: true },
-    { name: "Emergency Entrance",  pos: roomCenter(1440, 958, 1880, 1040, 35),color: "#ff3838",  fontSize: 20, bold: true },
+    { name: "Main Entrance",       pos: roomCenter(240, 958, 880, 1040, 35),  color: "#00cec9",  fontSize: 26, bold: true },
+    { name: "Emergency Entrance",  pos: roomCenter(1440, 958, 1880, 1040, 35),color: "#ff3838",  fontSize: 22, bold: true },
   ];
 
   return (
     <group>
       {departments.map((dept, idx) => (
         <group key={idx} position={dept.pos}>
-          {/* Background pill for text readability */}
+          {/* Subtle background pill for text readability */}
           <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -6, 0]}>
             <planeGeometry args={[
-              dept.name.length * dept.fontSize * 0.6,
+              dept.name.length * dept.fontSize * 0.65,
               dept.fontSize * 2.2
             ]} />
-            <meshBasicMaterial color="#ffffff" opacity={0.5} transparent />
+            <meshBasicMaterial color="#ffffff" opacity={0.6} transparent />
           </mesh>
           <Text
             position={[0, 0, 0]}
-            rotation={[-Math.PI / 2.15, 0, dept.vertical ? -Math.PI / 2 : 0]}
+            rotation={[-Math.PI / 3, 0, dept.vertical ? -Math.PI / 2 : 0]}
             fontSize={dept.fontSize}
             color={dept.color}
             anchorX="center"
             anchorY="middle"
-            outlineWidth={1.2}
+            outlineWidth={1.4}
             outlineColor="#ffffff"
             fontWeight={dept.bold ? "bold" : "normal"}
           >
@@ -191,47 +171,47 @@ function DepartmentLabels() {
 }
 
 // ============================================================================
-// NAVIGATION ROUTE — Main Entrance → Reception → Emergency
+// NAVIGATION ROUTE (Main Entrance → Reception & Casualty → Emergency)
 // ============================================================================
 function NavigationRoute() {
-  const h = 10;
+  const h = 12;
 
-  // Main Entrance → up into building → west to Reception
+  // Main Entrance → Corridor → Reception
   const toReception = [
-    [...svgToWorld(560, 990), h],  // Main Entrance (center of bottom corridor gap)
-    [...svgToWorld(560, 720), h],  // Move north into main hallway
-    [...svgToWorld(400, 720), h],  // Turn west
-    [...svgToWorld(400, 357), h],  // Arrive at Reception center
+    [...svgToWorld(560, 990), h],  // Main Entrance
+    [...svgToWorld(560, 720), h],  // South Corridor Junction
+    [...svgToWorld(400, 720), h],  // West Corridor
+    [...svgToWorld(400, 357), h],  // Reception Desk
   ].map(([x, z, y]) => [x, y, z]);
 
-  // Junction → east to Casuality → Emergency
+  // Junction → East to Casualty → Emergency
   const toEmergency = [
-    [...svgToWorld(560, 720), h],  // Junction
-    [...svgToWorld(940, 720), h],  // Move east
-    [...svgToWorld(940, 841), h],  // Enter Casuality area
-    [...svgToWorld(1220, 841), h], // Casuality center
-    [...svgToWorld(1500, 841), h], // Head to Emergency wing
-    [...svgToWorld(1720, 841), h], // Emergency center
+    [...svgToWorld(560, 720), h],  // South Corridor Junction
+    [...svgToWorld(940, 720), h],  // East Corridor Junction
+    [...svgToWorld(940, 841), h],  // Casualty Entry Way
+    [...svgToWorld(1220, 841), h], // Casualty Center
+    [...svgToWorld(1500, 841), h], // Emergency Wing Hallway
+    [...svgToWorld(1720, 841), h], // Emergency Room Center
   ].map(([x, z, y]) => [x, y, z]);
 
   return (
     <group>
-      <Line points={toReception} color="#00ff88" lineWidth={8} dashed dashScale={10} dashSize={4} />
-      <Line points={toEmergency} color="#00ff88" lineWidth={8} dashed dashScale={10} dashSize={4} />
+      <Line points={toReception} color="#00ff88" lineWidth={10} dashed dashScale={10} dashSize={4} />
+      <Line points={toEmergency} color="#00ff88" lineWidth={10} dashed dashScale={10} dashSize={4} />
 
-      {/* Start marker — Main Entrance */}
+      {/* Start Marker — Main Entrance */}
       <mesh position={toReception[0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[18, 32]} />
+        <circleGeometry args={[20, 32]} />
         <meshBasicMaterial color="#00ff88" />
       </mesh>
-      {/* Destination — Reception */}
+      {/* Destination Marker — Reception */}
       <mesh position={toReception[3]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[14, 22, 32]} />
+        <ringGeometry args={[16, 24, 32]} />
         <meshBasicMaterial color="#6c5ce7" />
       </mesh>
-      {/* Destination — Emergency */}
+      {/* Destination Marker — Emergency */}
       <mesh position={toEmergency[5]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[14, 22, 32]} />
+        <ringGeometry args={[16, 24, 32]} />
         <meshBasicMaterial color="#ff3838" />
       </mesh>
     </group>
@@ -239,7 +219,7 @@ function NavigationRoute() {
 }
 
 // ============================================================================
-// APP
+// MAIN APP COMPONENT
 // ============================================================================
 export default function App() {
   return (
@@ -261,7 +241,7 @@ export default function App() {
             🏥 Smart Hospital Navigation
           </h1>
           <p style={{ margin: '0.2rem 0 0 0', opacity: 0.7, fontSize: '0.85rem', color: '#dcdde1' }}>
-            Ground Floor • 2.5D Extruded Architecture
+            Ground Floor • True 2.5D Extruded Vector Architecture
           </p>
         </div>
         <div style={{
@@ -273,17 +253,17 @@ export default function App() {
           fontWeight: 'bold',
           color: '#00ff88'
         }}>
-          17 Rooms • {WALL_HEIGHT}px Walls
+          17 Rooms • {WALL_HEIGHT}px Extruded Walls
         </div>
       </header>
 
       {/* 3D Canvas */}
       <main style={{ flex: 1, position: 'relative', background: '#1e272e' }}>
         <Canvas
-          camera={{ position: [0, 900, 1000], fov: 50, near: 1, far: 6000 }}
+          camera={{ position: [0, 850, 950], fov: 50, near: 1, far: 6000 }}
           shadows
         >
-          <ambientLight intensity={0.65} />
+          <ambientLight intensity={0.7} />
           <directionalLight position={[600, 1000, 500]} intensity={1.3} castShadow />
           <directionalLight position={[-500, 700, -400]} intensity={0.4} />
           <Environment preset="city" />
