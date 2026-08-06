@@ -1,0 +1,165 @@
+import Node from '../model/node.js';
+
+// Create a new Node (Supports single object or bulk array)
+export const createNode = async (req, res) => {
+  try {
+    const data = req.body;
+
+    if (Array.isArray(data)) {
+      const nodes = await Node.insertMany(data);
+      return res.status(201).json({
+        success: true,
+        message: 'Nodes created successfully',
+        count: nodes.length,
+        data: nodes,
+      });
+    }
+
+    const { nodeId, name, type, x, y, floor } = data;
+
+    if (!nodeId || !name || !type || x === undefined || y === undefined || !floor) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields: nodeId, name, type, x, y, floor',
+      });
+    }
+
+    const existingNode = await Node.findOne({ nodeId });
+    if (existingNode) {
+      return res.status(400).json({
+        success: false,
+        message: `Node with nodeId '${nodeId}' already exists`,
+      });
+    }
+
+    const node = await Node.create({
+      nodeId,
+      name,
+      type,
+      x,
+      y,
+      floor,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Node created successfully',
+      data: node,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Error creating node',
+      error: error.message,
+    });
+  }
+};
+
+// Get all Nodes (Optional filter by floor query e.g. GET /api/nodes?floor=ground)
+export const getNodes = async (req, res) => {
+  try {
+    const filter = {};
+    if (req.query.floor) {
+      filter.floor = req.query.floor;
+    }
+    if (req.query.type) {
+      filter.type = req.query.type;
+    }
+
+    const nodes = await Node.find(filter);
+    return res.status(200).json({
+      success: true,
+      count: nodes.length,
+      data: nodes,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching nodes',
+      error: error.message,
+    });
+  }
+};
+
+// Get single Node by nodeId
+export const getNodeById = async (req, res) => {
+  try {
+    const { nodeId } = req.params;
+    const node = await Node.findOne({ nodeId });
+
+    if (!node) {
+      return res.status(404).json({
+        success: false,
+        message: `Node with nodeId '${nodeId}' not found`,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: node,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching node',
+      error: error.message,
+    });
+  }
+};
+
+// Update Node by nodeId
+export const updateNode = async (req, res) => {
+  try {
+    const { nodeId } = req.params;
+    const updatedNode = await Node.findOneAndUpdate({ nodeId }, req.body, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!updatedNode) {
+      return res.status(404).json({
+        success: false,
+        message: `Node with nodeId '${nodeId}' not found`,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Node updated successfully',
+      data: updatedNode,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Error updating node',
+      error: error.message,
+    });
+  }
+};
+
+// Delete Node by nodeId
+export const deleteNode = async (req, res) => {
+  try {
+    const { nodeId } = req.params;
+    const deletedNode = await Node.findOneAndDelete({ nodeId });
+
+    if (!deletedNode) {
+      return res.status(404).json({
+        success: false,
+        message: `Node with nodeId '${nodeId}' not found`,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'Node deleted successfully',
+      data: deletedNode,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Error deleting node',
+      error: error.message,
+    });
+  }
+};
