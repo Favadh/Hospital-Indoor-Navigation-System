@@ -25,6 +25,7 @@ const floorSchema = new mongoose.Schema(
       required: true,
     },
   },
+  { timestamps: true }
 );
 
 const Floor = mongoose.model('Floor', floorSchema);

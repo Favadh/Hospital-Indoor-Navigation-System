@@ -26,6 +26,7 @@ const nodeSchema = new mongoose.Schema(
       required: true,
     },
   },
+  { timestamps: true }
 );
 
 const Node = mongoose.model('Node', nodeSchema);

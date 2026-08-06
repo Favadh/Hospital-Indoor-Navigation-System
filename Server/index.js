@@ -6,6 +6,7 @@ import mongoose from 'mongoose';
 import floorRoutes from './routes/floorRoutes.js';
 import nodeRoutes from './routes/nodeRoutes.js';
 import edgeRoutes from './routes/edgeRoutes.js';
+import navigationRoutes from './routes/navigationRoutes.js';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -31,6 +32,7 @@ app.get('/', (req, res) => {
 app.use('/api/floors', floorRoutes);
 app.use('/api/nodes', nodeRoutes);
 app.use('/api/edges', edgeRoutes);
+app.use('/api/navigation', navigationRoutes);
 
 // Connect to MongoDB & Start Server
 const startServer = async () => {
