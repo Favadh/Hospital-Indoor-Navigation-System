@@ -5,9 +5,9 @@ import { findShortestPath } from '../utils/dijkstra.js';
 // GET or POST /api/navigation/shortest-path
 export const getShortestPath = async (req, res) => {
   try {
-    const start = req.query.start || req.body.start;
-    const destination = req.query.destination || req.body.destination;
-    const floor = req.query.floor || req.body.floor || 'ground';
+    const start = req.query?.start || req.body?.start;
+    const destination = req.query?.destination || req.body?.destination;
+    const floor = req.query?.floor || req.body?.floor || 'ground';
 
     if (!start || !destination) {
       return res.status(400).json({
@@ -16,21 +16,28 @@ export const getShortestPath = async (req, res) => {
       });
     }
 
-    // Fetch all nodes and edges for the specified floor from MongoDB
-    const nodes = await Node.find({ floor });
-    const edges = await Edge.find({ floor });
+    // Fetch nodes and edges from MongoDB
+    let nodes = await Node.find({ floor }).lean();
+    if (!nodes.length) {
+      nodes = await Node.find({}).lean();
+    }
+
+    let edges = await Edge.find({ floor }).lean();
+    if (!edges.length) {
+      edges = await Edge.find({}).lean();
+    }
 
     if (!nodes.length || !edges.length) {
       return res.status(404).json({
         success: false,
-        message: `No nodes or edges found for floor '${floor}'`,
+        message: `No nodes or edges found in database`,
       });
     }
 
     // Run Dijkstra pathfinder
     const result = findShortestPath(start, destination, nodes, edges);
 
-    if (!result.path.length) {
+    if (!result.path || !result.path.length) {
       return res.status(404).json({
         success: false,
         message: `No walkable path found from '${start}' to '${destination}'`,
@@ -47,6 +54,7 @@ export const getShortestPath = async (req, res) => {
       path: result.path,
     });
   } catch (error) {
+    console.error('Dijkstra navigation error:', error.stack || error);
     return res.status(500).json({
       success: false,
       message: 'Error computing shortest path',

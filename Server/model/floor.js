@@ -2,6 +2,12 @@ import mongoose from 'mongoose';
 
 const floorSchema = new mongoose.Schema(
   {
+    floorId: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+    },
     name: {
       type: String,
       required: true,

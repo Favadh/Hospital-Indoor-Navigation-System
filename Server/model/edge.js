@@ -2,6 +2,11 @@ import mongoose from 'mongoose';
 
 const edgeSchema = new mongoose.Schema(
   {
+    edgeId: {
+      type: String,
+      required: true,
+      trim: true,
+    },
     from: {
       type: String,
       ref: 'Node',
@@ -19,6 +24,11 @@ const edgeSchema = new mongoose.Schema(
     bidirectional: {
       type: Boolean,
       default: true,
+    },
+    floor: {
+      type: String,
+      ref: 'Floor',
+      default: 'ground',
     },
   },
   { timestamps: true }
