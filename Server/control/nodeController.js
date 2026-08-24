@@ -15,31 +15,24 @@ export const createNode = async (req, res) => {
       });
     }
 
-    const { nodeId, name, type, x, y, floor } = data;
+    const { name, type, x, y, floor } = data;
 
-    if (!nodeId || !name || !type || x === undefined || y === undefined || !floor) {
+    if (!name || !type || x === undefined || y === undefined || !floor) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide all required fields: nodeId, name, type, x, y, floor',
+        message: 'Please provide all required fields: name, type, x, y, floor',
       });
     }
 
-    const existingNode = await Node.findOne({ nodeId });
+    const existingNode = await Node.findOne({ name });
     if (existingNode) {
       return res.status(400).json({
         success: false,
-        message: `Node with nodeId '${nodeId}' already exists`,
+        message: `Node with name '${name}' already exists`,
       });
     }
 
-    const node = await Node.create({
-      nodeId,
-      name,
-      type,
-      x,
-      y,
-      floor,
-    });
+    const node = await Node.create({ name, type, x, y, floor });
 
     return res.status(201).json({
       success: true,
@@ -81,16 +74,16 @@ export const getNodes = async (req, res) => {
   }
 };
 
-// Get single Node by nodeId
+// Get single Node by MongoDB _id
 export const getNodeById = async (req, res) => {
   try {
-    const { nodeId } = req.params;
-    const node = await Node.findOne({ nodeId });
+    const { id } = req.params;
+    const node = await Node.findById(id);
 
     if (!node) {
       return res.status(404).json({
         success: false,
-        message: `Node with nodeId '${nodeId}' not found`,
+        message: `Node with id '${id}' not found`,
       });
     }
 
@@ -107,11 +100,11 @@ export const getNodeById = async (req, res) => {
   }
 };
 
-// Update Node by nodeId
+// Update Node by MongoDB _id
 export const updateNode = async (req, res) => {
   try {
-    const { nodeId } = req.params;
-    const updatedNode = await Node.findOneAndUpdate({ nodeId }, req.body, {
+    const { id } = req.params;
+    const updatedNode = await Node.findByIdAndUpdate(id, req.body, {
       new: true,
       runValidators: true,
     });
@@ -119,7 +112,7 @@ export const updateNode = async (req, res) => {
     if (!updatedNode) {
       return res.status(404).json({
         success: false,
-        message: `Node with nodeId '${nodeId}' not found`,
+        message: `Node with id '${id}' not found`,
       });
     }
 
@@ -137,16 +130,16 @@ export const updateNode = async (req, res) => {
   }
 };
 
-// Delete Node by nodeId
+// Delete Node by MongoDB _id
 export const deleteNode = async (req, res) => {
   try {
-    const { nodeId } = req.params;
-    const deletedNode = await Node.findOneAndDelete({ nodeId });
+    const { id } = req.params;
+    const deletedNode = await Node.findByIdAndDelete(id);
 
     if (!deletedNode) {
       return res.status(404).json({
         success: false,
-        message: `Node with nodeId '${nodeId}' not found`,
+        message: `Node with id '${id}' not found`,
       });
     }
 

@@ -1,6 +1,10 @@
 import http from 'http';
 
-http.get('http://localhost:8000/api/navigation/shortest-path?start=main_entrance&destination=icu', (res) => {
+// Now uses node name instead of nodeId
+const start = encodeURIComponent('Main Entrance');
+const destination = encodeURIComponent('ICU');
+
+http.get(`http://localhost:8000/api/navigation/shortest-path?start=${start}&destination=${destination}`, (res) => {
   let rawData = '';
   res.on('data', (chunk) => { rawData += chunk; });
   res.on('end', () => {

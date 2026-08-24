@@ -12,7 +12,7 @@ export const getShortestPath = async (req, res) => {
     if (!start || !destination) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide both start and destination parameters',
+        message: 'Please provide both start and destination parameters (node name)',
       });
     }
 
@@ -34,7 +34,7 @@ export const getShortestPath = async (req, res) => {
       });
     }
 
-    // Run Dijkstra pathfinder
+    // Run Dijkstra pathfinder (keyed by node name)
     const result = findShortestPath(start, destination, nodes, edges);
 
     if (!result.path || !result.path.length) {

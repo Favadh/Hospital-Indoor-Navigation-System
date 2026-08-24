@@ -13,7 +13,7 @@ router.route('/')
   .post(createFloor)
   .get(getFloors);
 
-router.route('/:floorId')
+router.route('/:id')
   .get(getFloorById)
   .put(updateFloor)
   .delete(deleteFloor);

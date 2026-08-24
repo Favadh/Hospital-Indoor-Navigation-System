@@ -1,26 +1,26 @@
 /**
  * Pure JavaScript Implementation of Dijkstra's Shortest Path Algorithm
  *
- * @param {String} startNodeId - Starting Node ID (e.g. 'main_entrance')
- * @param {String} destinationNodeId - Target Destination Node ID (e.g. 'icu')
+ * @param {String} startName - Starting Node name (e.g. 'Main Entrance')
+ * @param {String} destinationName - Target Destination Node name (e.g. 'ICU')
  * @param {Array} nodesList - Array of all Node documents from MongoDB
  * @param {Array} edgesList - Array of all Edge documents from MongoDB
  * @returns {Object} { path: Array<Node>, totalDistance: Number }
  */
-export const findShortestPath = (startNodeId, destinationNodeId, nodesList, edgesList) => {
+export const findShortestPath = (startName, destinationName, nodesList, edgesList) => {
   const nodeMap = new Map();
-  nodesList.forEach((n) => nodeMap.set(n.nodeId, n));
+  nodesList.forEach((n) => nodeMap.set(n.name, n));
 
-  if (!nodeMap.has(startNodeId)) {
-    throw new Error(`Start node '${startNodeId}' not found in graph`);
+  if (!nodeMap.has(startName)) {
+    throw new Error(`Start node '${startName}' not found in graph`);
   }
-  if (!nodeMap.has(destinationNodeId)) {
-    throw new Error(`Destination node '${destinationNodeId}' not found in graph`);
+  if (!nodeMap.has(destinationName)) {
+    throw new Error(`Destination node '${destinationName}' not found in graph`);
   }
 
   // 1. Build Adjacency List Graph
   const graph = new Map();
-  nodeMap.forEach((_, nodeId) => graph.set(nodeId, []));
+  nodeMap.forEach((_, name) => graph.set(name, []));
 
   edgesList.forEach((edge) => {
     const { from, to, weight, bidirectional = true } = edge;
@@ -37,13 +37,13 @@ export const findShortestPath = (startNodeId, destinationNodeId, nodesList, edge
   const previous = new Map();
   const unvisited = new Set();
 
-  nodeMap.forEach((_, nodeId) => {
-    distances.set(nodeId, Infinity);
-    previous.set(nodeId, null);
-    unvisited.add(nodeId);
+  nodeMap.forEach((_, name) => {
+    distances.set(name, Infinity);
+    previous.set(name, null);
+    unvisited.add(name);
   });
 
-  distances.set(startNodeId, 0);
+  distances.set(startName, 0);
 
   // 3. Dijkstra Search Loop
   while (unvisited.size > 0) {
@@ -51,16 +51,16 @@ export const findShortestPath = (startNodeId, destinationNodeId, nodesList, edge
     let current = null;
     let smallestDistance = Infinity;
 
-    for (const nodeId of unvisited) {
-      const distVal = distances.get(nodeId);
+    for (const name of unvisited) {
+      const distVal = distances.get(name);
       if (distVal < smallestDistance) {
         smallestDistance = distVal;
-        current = nodeId;
+        current = name;
       }
     }
 
     // If destination reached or remaining nodes are unreachable
-    if (current === null || current === destinationNodeId || smallestDistance === Infinity) {
+    if (current === null || current === destinationName || smallestDistance === Infinity) {
       break;
     }
 
@@ -81,9 +81,9 @@ export const findShortestPath = (startNodeId, destinationNodeId, nodesList, edge
 
   // 4. Reconstruct Shortest Path Array
   const path = [];
-  let curr = destinationNodeId;
+  let curr = destinationName;
 
-  if (distances.get(destinationNodeId) === Infinity) {
+  if (distances.get(destinationName) === Infinity) {
     return { path: [], totalDistance: 0 };
   }
 
@@ -97,6 +97,6 @@ export const findShortestPath = (startNodeId, destinationNodeId, nodesList, edge
 
   return {
     path,
-    totalDistance: distances.get(destinationNodeId),
+    totalDistance: distances.get(destinationName),
   };
 };

@@ -2,15 +2,10 @@ import mongoose from 'mongoose';
 
 const nodeSchema = new mongoose.Schema(
   {
-    nodeId: {
-      type: String,
-      required: true,
-      unique: true,
-      trim: true,
-    },
     name: {
       type: String,
       required: true,
+      unique: true,
       trim: true,
     },
     type: {

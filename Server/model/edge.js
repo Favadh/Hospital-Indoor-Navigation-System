@@ -2,11 +2,6 @@ import mongoose from 'mongoose';
 
 const edgeSchema = new mongoose.Schema(
   {
-    edgeId: {
-      type: String,
-      required: true,
-      trim: true,
-    },
     from: {
       type: String,
       ref: 'Node',

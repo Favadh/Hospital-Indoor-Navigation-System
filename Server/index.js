@@ -15,7 +15,18 @@ const app = express();
 const PORT = process.env.PORT || 8000;
 const MONGO_URI = process.env.MONGO_URI;
 
-// Middleware
+// Middleware for CORS & Chrome Private Network Access (PNA)
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Private-Network', 'true');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -34,7 +45,7 @@ app.use('/api/nodes', nodeRoutes);
 app.use('/api/edges', edgeRoutes);
 app.use('/api/navigation', navigationRoutes);
 
-// Connect to MongoDB & Start Server
+// Connect to MongoDB & Start Server on All Interfaces (0.0.0.0)
 const startServer = async () => {
   try {
     if (!MONGO_URI) {
@@ -44,8 +55,8 @@ const startServer = async () => {
     await mongoose.connect(MONGO_URI);
     console.log('✅ Connected to MongoDB successfully');
 
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on http://localhost:${PORT}`);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server running on http://0.0.0.0:${PORT} (listening on all network interfaces)`);
     });
   } catch (error) {
     console.error('❌ Database connection error:', error.message);

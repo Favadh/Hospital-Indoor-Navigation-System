@@ -15,31 +15,24 @@ export const createFloor = async (req, res) => {
       });
     }
 
-    const { floorId, name, level, svgFile, svgWidth, svgHeight } = data;
+    const { name, level, svgFile, svgWidth, svgHeight } = data;
 
-    if (!floorId || !name || level === undefined || !svgFile || !svgWidth || !svgHeight) {
+    if (!name || level === undefined || !svgFile || !svgWidth || !svgHeight) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide all required fields: floorId, name, level, svgFile, svgWidth, svgHeight',
+        message: 'Please provide all required fields: name, level, svgFile, svgWidth, svgHeight',
       });
     }
 
-    const existingFloor = await Floor.findOne({ floorId });
+    const existingFloor = await Floor.findOne({ name });
     if (existingFloor) {
       return res.status(400).json({
         success: false,
-        message: `Floor with floorId '${floorId}' already exists`,
+        message: `Floor with name '${name}' already exists`,
       });
     }
 
-    const floor = await Floor.create({
-      floorId,
-      name,
-      level,
-      svgFile,
-      svgWidth,
-      svgHeight,
-    });
+    const floor = await Floor.create({ name, level, svgFile, svgWidth, svgHeight });
 
     return res.status(201).json({
       success: true,
@@ -73,16 +66,16 @@ export const getFloors = async (req, res) => {
   }
 };
 
-// Get single Floor by floorId
+// Get single Floor by MongoDB _id
 export const getFloorById = async (req, res) => {
   try {
-    const { floorId } = req.params;
-    const floor = await Floor.findOne({ floorId });
+    const { id } = req.params;
+    const floor = await Floor.findById(id);
 
     if (!floor) {
       return res.status(404).json({
         success: false,
-        message: `Floor with floorId '${floorId}' not found`,
+        message: `Floor with id '${id}' not found`,
       });
     }
 
@@ -99,11 +92,11 @@ export const getFloorById = async (req, res) => {
   }
 };
 
-// Update Floor by floorId
+// Update Floor by MongoDB _id
 export const updateFloor = async (req, res) => {
   try {
-    const { floorId } = req.params;
-    const updatedFloor = await Floor.findOneAndUpdate({ floorId }, req.body, {
+    const { id } = req.params;
+    const updatedFloor = await Floor.findByIdAndUpdate(id, req.body, {
       new: true,
       runValidators: true,
     });
@@ -111,7 +104,7 @@ export const updateFloor = async (req, res) => {
     if (!updatedFloor) {
       return res.status(404).json({
         success: false,
-        message: `Floor with floorId '${floorId}' not found`,
+        message: `Floor with id '${id}' not found`,
       });
     }
 
@@ -129,16 +122,16 @@ export const updateFloor = async (req, res) => {
   }
 };
 
-// Delete Floor by floorId
+// Delete Floor by MongoDB _id
 export const deleteFloor = async (req, res) => {
   try {
-    const { floorId } = req.params;
-    const deletedFloor = await Floor.findOneAndDelete({ floorId });
+    const { id } = req.params;
+    const deletedFloor = await Floor.findByIdAndDelete(id);
 
     if (!deletedFloor) {
       return res.status(404).json({
         success: false,
-        message: `Floor with floorId '${floorId}' not found`,
+        message: `Floor with id '${id}' not found`,
       });
     }
 

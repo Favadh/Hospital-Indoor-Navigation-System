@@ -13,7 +13,7 @@ router.route('/')
   .post(createEdge)
   .get(getEdges);
 
-router.route('/:edgeId')
+router.route('/:id')
   .get(getEdgeById)
   .put(updateEdge)
   .delete(deleteEdge);

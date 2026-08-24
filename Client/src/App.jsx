@@ -16,96 +16,96 @@ function svgToWorld(sx, sy) {
   return [sx + OFFSET_X, sy + OFFSET_Z];
 }
 
-// 40 Fallback Nodes
+// 40 Fallback Nodes (using name as identifier)
 const LOCAL_NODES = [
-  { nodeId: 'main_entrance', name: 'Main Entrance', type: 'entrance', x: 940, y: 999 },
-  { nodeId: 'emergency_entrance', name: 'Emergency Entrance', type: 'entrance', x: 1500, y: 999 },
-  { nodeId: 'reception', name: 'Reception', type: 'room', x: 400, y: 438 },
-  { nodeId: 'registration', name: 'Registration', type: 'room', x: 840, y: 438 },
-  { nodeId: 'waiting_area', name: 'Waiting Area', type: 'room', x: 620, y: 720 },
-  { nodeId: 'pharmacy', name: 'Pharmacy', type: 'room', x: 240, y: 720 },
-  { nodeId: 'cafeteria', name: 'Cafeteria', type: 'room', x: 240, y: 215 },
-  { nodeId: 'toilet', name: 'Toilet', type: 'room', x: 400, y: 160 },
-  { nodeId: 'lift', name: 'Lift', type: 'room', x: 872, y: 160 },
-  { nodeId: 'stair', name: 'Stair', type: 'room', x: 929, y: 160 },
-  { nodeId: 'ot', name: 'OT', type: 'room', x: 1437, y: 175 },
-  { nodeId: 'lab', name: 'Lab', type: 'room', x: 1437, y: 451 },
-  { nodeId: 'casuality', name: 'Casuality', type: 'room', x: 1437, y: 839 },
-  { nodeId: 'icu', name: 'ICU', type: 'room', x: 1560, y: 141 },
-  { nodeId: 'recovery_ward', name: 'Recovery Ward', type: 'room', x: 1560, y: 361 },
-  { nodeId: 'xray', name: 'X-Ray', type: 'room', x: 1560, y: 601 },
-  { nodeId: 'emergency', name: 'Emergency', type: 'room', x: 1560, y: 841 },
+  { name: 'Main Entrance', type: 'entrance', x: 940, y: 999 },
+  { name: 'Emergency Entrance', type: 'entrance', x: 1500, y: 999 },
+  { name: 'Reception', type: 'room', x: 400, y: 438 },
+  { name: 'Registration', type: 'room', x: 840, y: 438 },
+  { name: 'Waiting Area', type: 'room', x: 620, y: 720 },
+  { name: 'Pharmacy', type: 'room', x: 240, y: 720 },
+  { name: 'Cafeteria', type: 'room', x: 240, y: 215 },
+  { name: 'Toilet', type: 'room', x: 400, y: 160 },
+  { name: 'Lift', type: 'room', x: 872, y: 160 },
+  { name: 'Stair', type: 'room', x: 929, y: 160 },
+  { name: 'OT', type: 'room', x: 1437, y: 175 },
+  { name: 'Lab', type: 'room', x: 1437, y: 451 },
+  { name: 'Casuality', type: 'room', x: 1437, y: 839 },
+  { name: 'ICU', type: 'room', x: 1560, y: 141 },
+  { name: 'Recovery Ward', type: 'room', x: 1560, y: 361 },
+  { name: 'X-Ray', type: 'room', x: 1560, y: 601 },
+  { name: 'Emergency', type: 'room', x: 1560, y: 841 },
 
   // Junctions
-  { nodeId: 'j_west', name: 'West Corridor Junction', type: 'junction', x: 312, y: 500 },
-  { nodeId: 'j_pharmacy', name: 'Pharmacy Junction', type: 'junction', x: 312, y: 720 },
-  { nodeId: 'j_reception', name: 'Reception Hallway', type: 'junction', x: 400, y: 500 },
-  { nodeId: 'j_mid_center', name: 'Mid Center Corridor', type: 'junction', x: 620, y: 500 },
-  { nodeId: 'j_registration', name: 'Registration Hallway', type: 'junction', x: 840, y: 500 },
-  { nodeId: 'j_north_west_wing', name: 'North West Wing Junction', type: 'junction', x: 400, y: 215 },
-  { nodeId: 'j_north_mid', name: 'Central North Corridor', type: 'junction', x: 620, y: 215 },
-  { nodeId: 'j_lift', name: 'Lift Junction', type: 'junction', x: 872, y: 215 },
-  { nodeId: 'j_stair', name: 'Stair Junction', type: 'junction', x: 929, y: 215 },
-  { nodeId: 'j_main_hallway', name: 'Main Hallway Junction', type: 'junction', x: 940, y: 720 },
-  { nodeId: 'j_rw_connector', name: 'Right Wing Connector', type: 'junction', x: 1500, y: 653 },
-  { nodeId: 'j_rw_ot', name: 'OT Hallway Junction', type: 'junction', x: 1500, y: 175 },
-  { nodeId: 'j_rw_lab', name: 'Lab Hallway Junction', type: 'junction', x: 1500, y: 451 },
-  { nodeId: 'j_rw_icu', name: 'ICU Hallway Junction', type: 'junction', x: 1500, y: 141 },
-  { nodeId: 'j_rw_recovery', name: 'Recovery Hallway Junction', type: 'junction', x: 1500, y: 361 },
-  { nodeId: 'j_rw_xray', name: 'X-Ray Hallway Junction', type: 'junction', x: 1500, y: 601 },
-  { nodeId: 'j_rw_emergency_wing', name: 'Emergency Wing Junction', type: 'junction', x: 1500, y: 841 },
-  { nodeId: 'j_north_east_spine', name: 'North East Spine Junction', type: 'junction', x: 1053, y: 215 },
-  { nodeId: 'j_south_main', name: 'South Main Junction', type: 'junction', x: 1053, y: 653 },
-  { nodeId: 'j_east_mid_hallway', name: 'East Mid Hallway Junction', type: 'junction', x: 1053, y: 500 },
-  { nodeId: 'j_main_entrance_hallway', name: 'Main Entrance Connector', type: 'junction', x: 940, y: 653 },
-  { nodeId: 'j_south_corridor_loop', name: 'South Entrance Hallway', type: 'junction', x: 940, y: 916 },
-  { nodeId: 'j_south_west_loop', name: 'South West Outer Junction', type: 'junction', x: 312, y: 916 },
+  { name: 'West Corridor Junction', type: 'junction', x: 312, y: 500 },
+  { name: 'Pharmacy Junction', type: 'junction', x: 312, y: 720 },
+  { name: 'Reception Hallway', type: 'junction', x: 400, y: 500 },
+  { name: 'Mid Center Corridor', type: 'junction', x: 620, y: 500 },
+  { name: 'Registration Hallway', type: 'junction', x: 840, y: 500 },
+  { name: 'North West Wing Junction', type: 'junction', x: 400, y: 215 },
+  { name: 'Central North Corridor', type: 'junction', x: 620, y: 215 },
+  { name: 'Lift Junction', type: 'junction', x: 872, y: 215 },
+  { name: 'Stair Junction', type: 'junction', x: 929, y: 215 },
+  { name: 'Main Hallway Junction', type: 'junction', x: 940, y: 720 },
+  { name: 'Right Wing Connector', type: 'junction', x: 1500, y: 653 },
+  { name: 'OT Hallway Junction', type: 'junction', x: 1500, y: 175 },
+  { name: 'Lab Hallway Junction', type: 'junction', x: 1500, y: 451 },
+  { name: 'ICU Hallway Junction', type: 'junction', x: 1500, y: 141 },
+  { name: 'Recovery Hallway Junction', type: 'junction', x: 1500, y: 361 },
+  { name: 'X-Ray Hallway Junction', type: 'junction', x: 1500, y: 601 },
+  { name: 'Emergency Wing Junction', type: 'junction', x: 1500, y: 841 },
+  { name: 'North East Spine Junction', type: 'junction', x: 1053, y: 215 },
+  { name: 'South Main Junction', type: 'junction', x: 1053, y: 653 },
+  { name: 'East Mid Hallway Junction', type: 'junction', x: 1053, y: 500 },
+  { name: 'Main Entrance Connector', type: 'junction', x: 940, y: 653 },
+  { name: 'South Entrance Hallway', type: 'junction', x: 940, y: 916 },
+  { name: 'South West Outer Junction', type: 'junction', x: 312, y: 916 },
 ];
 
 const LOCAL_EDGES = [
-  { from: 'cafeteria', to: 'j_north_west_wing' },
-  { from: 'toilet', to: 'j_north_west_wing' },
-  { from: 'lift', to: 'j_lift' },
-  { from: 'stair', to: 'j_stair' },
-  { from: 'reception', to: 'j_reception' },
-  { from: 'registration', to: 'j_registration' },
-  { from: 'pharmacy', to: 'j_pharmacy' },
-  { from: 'ot', to: 'j_rw_ot' },
-  { from: 'lab', to: 'j_rw_lab' },
-  { from: 'casuality', to: 'j_rw_emergency_wing' },
-  { from: 'emergency', to: 'j_rw_emergency_wing' },
-  { from: 'icu', to: 'j_rw_icu' },
-  { from: 'recovery_ward', to: 'j_rw_recovery' },
-  { from: 'xray', to: 'j_rw_xray' },
-  { from: 'main_entrance', to: 'j_south_corridor_loop' },
-  { from: 'emergency_entrance', to: 'j_rw_emergency_wing' },
-  { from: 'main_entrance', to: 'emergency_entrance' },
-  { from: 'j_north_west_wing', to: 'j_north_mid' },
-  { from: 'j_north_mid', to: 'j_lift' },
-  { from: 'j_lift', to: 'j_stair' },
-  { from: 'j_stair', to: 'j_north_east_spine' },
-  { from: 'j_west', to: 'j_reception' },
-  { from: 'j_reception', to: 'j_mid_center' },
-  { from: 'j_mid_center', to: 'j_registration' },
-  { from: 'j_registration', to: 'j_east_mid_hallway' },
-  { from: 'j_north_mid', to: 'j_mid_center' },
-  { from: 'j_north_east_spine', to: 'j_east_mid_hallway' },
-  { from: 'j_east_mid_hallway', to: 'j_south_main' },
-  { from: 'j_main_entrance_hallway', to: 'j_south_main' },
-  { from: 'j_south_main', to: 'j_rw_connector' },
-  { from: 'j_main_entrance_hallway', to: 'j_main_hallway' },
-  { from: 'j_main_hallway', to: 'waiting_area' },
-  { from: 'waiting_area', to: 'j_pharmacy' },
-  { from: 'j_west', to: 'j_pharmacy' },
-  { from: 'j_pharmacy', to: 'j_south_west_loop' },
-  { from: 'j_south_west_loop', to: 'j_south_corridor_loop' },
-  { from: 'j_south_corridor_loop', to: 'j_main_entrance_hallway' },
-  { from: 'j_rw_icu', to: 'j_rw_ot' },
-  { from: 'j_rw_ot', to: 'j_rw_recovery' },
-  { from: 'j_rw_recovery', to: 'j_rw_lab' },
-  { from: 'j_rw_lab', to: 'j_rw_xray' },
-  { from: 'j_rw_xray', to: 'j_rw_connector' },
-  { from: 'j_rw_connector', to: 'j_rw_emergency_wing' },
+  { from: 'Cafeteria', to: 'North West Wing Junction' },
+  { from: 'Toilet', to: 'North West Wing Junction' },
+  { from: 'Lift', to: 'Lift Junction' },
+  { from: 'Stair', to: 'Stair Junction' },
+  { from: 'Reception', to: 'Reception Hallway' },
+  { from: 'Registration', to: 'Registration Hallway' },
+  { from: 'Pharmacy', to: 'Pharmacy Junction' },
+  { from: 'OT', to: 'OT Hallway Junction' },
+  { from: 'Lab', to: 'Lab Hallway Junction' },
+  { from: 'Casuality', to: 'Emergency Wing Junction' },
+  { from: 'Emergency', to: 'Emergency Wing Junction' },
+  { from: 'ICU', to: 'ICU Hallway Junction' },
+  { from: 'Recovery Ward', to: 'Recovery Hallway Junction' },
+  { from: 'X-Ray', to: 'X-Ray Hallway Junction' },
+  { from: 'Main Entrance', to: 'South Entrance Hallway' },
+  { from: 'Emergency Entrance', to: 'Emergency Wing Junction' },
+  { from: 'Main Entrance', to: 'Emergency Entrance' },
+  { from: 'North West Wing Junction', to: 'Central North Corridor' },
+  { from: 'Central North Corridor', to: 'Lift Junction' },
+  { from: 'Lift Junction', to: 'Stair Junction' },
+  { from: 'Stair Junction', to: 'North East Spine Junction' },
+  { from: 'West Corridor Junction', to: 'Reception Hallway' },
+  { from: 'Reception Hallway', to: 'Mid Center Corridor' },
+  { from: 'Mid Center Corridor', to: 'Registration Hallway' },
+  { from: 'Registration Hallway', to: 'East Mid Hallway Junction' },
+  { from: 'Central North Corridor', to: 'Mid Center Corridor' },
+  { from: 'North East Spine Junction', to: 'East Mid Hallway Junction' },
+  { from: 'East Mid Hallway Junction', to: 'South Main Junction' },
+  { from: 'Main Entrance Connector', to: 'South Main Junction' },
+  { from: 'South Main Junction', to: 'Right Wing Connector' },
+  { from: 'Main Entrance Connector', to: 'Main Hallway Junction' },
+  { from: 'Main Hallway Junction', to: 'Waiting Area' },
+  { from: 'Waiting Area', to: 'Pharmacy Junction' },
+  { from: 'West Corridor Junction', to: 'Pharmacy Junction' },
+  { from: 'Pharmacy Junction', to: 'South West Outer Junction' },
+  { from: 'South West Outer Junction', to: 'South Entrance Hallway' },
+  { from: 'South Entrance Hallway', to: 'Main Entrance Connector' },
+  { from: 'ICU Hallway Junction', to: 'OT Hallway Junction' },
+  { from: 'OT Hallway Junction', to: 'Recovery Hallway Junction' },
+  { from: 'Recovery Hallway Junction', to: 'Lab Hallway Junction' },
+  { from: 'Lab Hallway Junction', to: 'X-Ray Hallway Junction' },
+  { from: 'X-Ray Hallway Junction', to: 'Right Wing Connector' },
+  { from: 'Right Wing Connector', to: 'Emergency Wing Junction' },
 ];
 
 // ============================================================================
@@ -198,7 +198,7 @@ function GraphDebugOverlay({ nodes, edges }) {
   };
 
   const nodeMap = new Map();
-  nodes.forEach((n) => nodeMap.set(n.nodeId, n));
+  nodes.forEach((n) => nodeMap.set(n.name, n));
 
   return (
     <group>
@@ -221,12 +221,12 @@ function GraphDebugOverlay({ nodes, edges }) {
       })}
 
       {/* Render Nodes */}
-      {nodes.map((n) => {
+      {nodes.map((n, idx) => {
         const [wx, wz] = svgToWorld(n.x, n.y);
         const color = getNodeColor(n.type);
 
         return (
-          <group key={n.nodeId} position={[wx, 15, wz]}>
+          <group key={n._id || n.name || idx} position={[wx, 15, wz]}>
             <mesh>
               <sphereGeometry args={[10, 16, 16]} />
               <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.5} />
@@ -330,31 +330,38 @@ export default function App() {
   const [nodes, setNodes] = useState(LOCAL_NODES);
   const [edges, setEdges] = useState(LOCAL_EDGES);
 
-  // Navigation State
-  const [startNodeId, setStartNodeId] = useState('main_entrance');
-  const [destNodeId, setDestNodeId] = useState('icu');
+  // Navigation State (uses node name)
+  const [startName, setStartName] = useState('Main Entrance');
+  const [destName, setDestName] = useState('ICU');
   const [routeData, setRouteData] = useState(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [navError, setNavError] = useState(null);
 
   const isDev = import.meta.env.DEV || process.env.NODE_ENV !== 'production';
 
+  // Dynamic API Base URL (Resolves to host IP or localhost automatically)
+  const API_BASE_URL =
+    import.meta.env.VITE_API_URL ||
+    (typeof window !== 'undefined'
+      ? `http://${window.location.hostname}:8000`
+      : 'http://localhost:8000');
+
   // Fetch Nodes & Edges from Backend
   useEffect(() => {
-    fetch('http://localhost:8000/api/nodes')
+    fetch(`${API_BASE_URL}/api/nodes`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.data?.length) setNodes(data.data);
       })
       .catch(() => console.log('Using local fallback node coordinates'));
 
-    fetch('http://localhost:8000/api/edges')
+    fetch(`${API_BASE_URL}/api/edges`)
       .then((res) => res.json())
       .then((data) => {
         if (data?.data?.length) setEdges(data.data);
       })
       .catch(() => console.log('Using local fallback edge connections'));
-  }, []);
+  }, [API_BASE_URL]);
 
   // Filterable Node Lists for Form
   const selectableStartNodes = nodes.filter((n) => n.type === 'entrance' || n.type === 'room');
@@ -362,8 +369,8 @@ export default function App() {
 
   // Trigger Dijkstra Navigation API
   const handleFindShortestPath = async () => {
-    if (!startNodeId || !destNodeId) return;
-    if (startNodeId === destNodeId) {
+    if (!startName || !destName) return;
+    if (startName === destName) {
       setNavError('Start and Destination locations must be different!');
       return;
     }
@@ -373,7 +380,7 @@ export default function App() {
 
     try {
       const response = await fetch(
-        `http://localhost:8000/api/navigation/shortest-path?start=${startNodeId}&destination=${destNodeId}`
+        `${API_BASE_URL}/api/navigation/shortest-path?start=${encodeURIComponent(startName)}&destination=${encodeURIComponent(destName)}`
       );
       const data = await response.json();
 
@@ -472,8 +479,8 @@ export default function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <label style={{ fontSize: '0.75rem', color: '#00ff88', fontWeight: 'bold' }}>🚩 Current Location:</label>
             <select
-              value={startNodeId}
-              onChange={(e) => setStartNodeId(e.target.value)}
+              value={startName}
+              onChange={(e) => setStartName(e.target.value)}
               style={{
                 padding: '8px 14px',
                 borderRadius: '6px',
@@ -486,7 +493,7 @@ export default function App() {
               }}
             >
               {selectableStartNodes.map((n, idx) => (
-                <option key={n.nodeId || n._id || idx} value={n.nodeId || n._id}>
+                <option key={n._id || n.name || idx} value={n.name}>
                   {n.name} ({n.type})
                 </option>
               ))}
@@ -499,8 +506,8 @@ export default function App() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <label style={{ fontSize: '0.75rem', color: '#ff3838', fontWeight: 'bold' }}>🎯 Destination:</label>
             <select
-              value={destNodeId}
-              onChange={(e) => setDestNodeId(e.target.value)}
+              value={destName}
+              onChange={(e) => setDestName(e.target.value)}
               style={{
                 padding: '8px 14px',
                 borderRadius: '6px',
@@ -513,7 +520,7 @@ export default function App() {
               }}
             >
               {selectableDestNodes.map((n, idx) => (
-                <option key={n.nodeId || n._id || idx} value={n.nodeId || n._id}>
+                <option key={n._id || n.name || idx} value={n.name}>
                   {n.name}
                 </option>
               ))}

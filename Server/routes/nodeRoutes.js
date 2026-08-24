@@ -13,7 +13,7 @@ router.route('/')
   .post(createNode)
   .get(getNodes);
 
-router.route('/:nodeId')
+router.route('/:id')
   .get(getNodeById)
   .put(updateNode)
   .delete(deleteNode);
