@@ -1,20 +1,11 @@
 import React from 'react';
 import { Text, Line } from '@react-three/drei';
+import { svgToWorld } from '../constants/mapConstants';
 
-// --- COORDINATE CONVERSION (must match App.jsx constants) ---
-const SVG_W = 1920;
-const SVG_H = 1080;
-const OFFSET_X = -SVG_W / 2;
-const OFFSET_Z = -SVG_H / 2;
-
-function svgToWorld(sx, sy) {
-  return [sx + OFFSET_X, sy + OFFSET_Z];
-}
-
-// ============================================================================
-// 3D GRAPH DEBUG OVERLAY (Admin / Dev Tool)
-// Renders all nodes as colored spheres and all edges as green lines on the 3D map
-// ============================================================================
+/**
+ * 3D Graph Debug Overlay (Admin / Dev Tool)
+ * Renders all nodes as colored spheres and all edges as green lines on the 3D map.
+ */
 export default function GraphDebugOverlay({ nodes, edges }) {
   const getNodeColor = (type) => {
     switch (type) {
