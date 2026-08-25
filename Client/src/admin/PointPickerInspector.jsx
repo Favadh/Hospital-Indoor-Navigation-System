@@ -4,7 +4,7 @@ const SVG_W = 1920;
 const SVG_H = 1080;
 
 // ============================================================================
-// POINT & CLICK INSPECTOR COMPONENT (Preserved for Admin Module / Dev Tools)
+// POINT & CLICK INSPECTOR COMPONENT (Admin Module / Dev Tools)
 // ============================================================================
 export default function PointPickerInspector({ onClose, nodes = [], edges = [] }) {
   const [clickedPin, setClickedPin] = useState(null);
@@ -12,7 +12,7 @@ export default function PointPickerInspector({ onClose, nodes = [], edges = [] }
   const [copiedIndex, setCopiedIndex] = useState(null);
 
   const nodeMap = new Map();
-  nodes.forEach((n) => nodeMap.set(n.nodeId, n));
+  nodes.forEach((n) => nodeMap.set(n.name, n));
 
   const handleMapClick = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -89,8 +89,8 @@ export default function PointPickerInspector({ onClose, nodes = [], edges = [] }
             </svg>
 
             {/* 2D Overlay of NODES */}
-            {nodes.map((n) => (
-              <div key={n.nodeId} style={{
+            {nodes.map((n, idx) => (
+              <div key={n._id || n.name || idx} style={{
                 position: 'absolute',
                 left: `${(n.x / SVG_W) * 100}%`,
                 top: `${(n.y / SVG_H) * 100}%`,
