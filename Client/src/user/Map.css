@@ -1,0 +1,116 @@
+/* ==========================================================================
+   Map.css — Dedicated styles for the 3D Map & Navigation Screen
+   ========================================================================== */
+
+.map-page-container {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+  background: #1e272e;
+}
+
+/* Status & Error Screen Overlay */
+.map-status-overlay {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0c0c1d;
+  font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+
+.map-error-card {
+  background: #161625;
+  border: 2px solid #e74c3c;
+  border-radius: 16px;
+  padding: 40px 50px;
+  text-align: center;
+  max-width: 480px;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+}
+
+.map-error-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+}
+
+.map-error-title {
+  color: #e74c3c;
+  margin: 0 0 10px 0;
+  font-size: 1.4rem;
+}
+
+.map-error-desc {
+  color: #dcdde1;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  margin: 0 0 24px 0;
+}
+
+.map-error-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.btn-retry {
+  padding: 10px 24px;
+  border-radius: 8px;
+  background: #00ff88;
+  color: #000000;
+  border: none;
+  font-weight: bold;
+  font-size: 0.9rem;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0, 255, 136, 0.4);
+  transition: transform 0.15s ease;
+}
+
+.btn-retry:hover {
+  transform: translateY(-2px);
+}
+
+.btn-home {
+  padding: 10px 20px;
+  border-radius: 8px;
+  background: #2f3542;
+  color: #ffffff;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  transition: background 0.15s ease;
+}
+
+.btn-home:hover {
+  background: #4b6584;
+}
+
+/* Loading Spinner */
+.map-loading-box {
+  text-align: center;
+}
+
+.map-spinner-icon {
+  font-size: 2.8rem;
+  margin-bottom: 16px;
+  display: inline-block;
+  animation: hospitalPulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes hospitalPulse {
+  0% { transform: scale(0.9); opacity: 0.7; }
+  100% { transform: scale(1.15); opacity: 1; }
+}
+
+.map-loading-text {
+  color: #00ff88;
+  font-size: 1.1rem;
+  font-weight: bold;
+  letter-spacing: 0.5px;
+}

@@ -4,13 +4,12 @@ import { OrbitControls, Environment } from '@react-three/drei';
 import ExtrudedWalls from './ExtrudedWalls';
 import DepartmentLabels from './DepartmentLabels';
 import DynamicNavigationRoute from './DynamicNavigationRoute';
-import GraphDebugOverlay from '../admin/GraphDebugOverlay';
 
 /**
  * Assembles the full 3D Canvas scene: lighting, walls, navigation route,
- * department labels, optional graph debug overlay, and orbit camera controls.
+ * department labels, and orbit camera controls.
  */
-export default function MapScene({ nodes, edges, showGraph, routeData }) {
+export default function MapScene({ nodes, routeData }) {
   return (
     <main style={{ flex: 1, position: 'relative', background: '#1e272e' }}>
       <Canvas camera={{ position: [0, 950, 1050], fov: 50, near: 1, far: 6000 }} shadows>
@@ -21,8 +20,7 @@ export default function MapScene({ nodes, edges, showGraph, routeData }) {
 
         <React.Suspense fallback={null}>
           <ExtrudedWalls />
-          {nodes.length > 0 && <DepartmentLabels nodes={nodes} />}
-          {showGraph && <GraphDebugOverlay nodes={nodes} edges={edges} />}
+          {nodes && nodes.length > 0 && <DepartmentLabels nodes={nodes} />}
           {routeData && <DynamicNavigationRoute routePath={routeData.path} />}
         </React.Suspense>
 

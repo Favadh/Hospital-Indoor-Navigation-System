@@ -2,20 +2,36 @@ body, html {
   margin: 0;
   padding: 0;
   font-family: 'Inter', sans-serif;
-  overflow: hidden;
+  background: #090a15;
+  color: #ffffff;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 * {
   box-sizing: border-box;
 }
 
-h1 {
-  margin: 0;
-  font-size: 1.5rem;
+/* Custom scrollbar for modern dark theme */
+::-webkit-scrollbar {
+  width: 8px;
 }
 
-p {
-  margin: 0.5rem 0 0 0;
-  font-size: 0.9rem;
-  opacity: 0.8;
+::-webkit-scrollbar-track {
+  background: #090a15;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1e203c;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00ff8888;
 }
