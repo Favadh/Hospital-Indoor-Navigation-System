@@ -5,6 +5,7 @@ import { OrbitControls, Environment } from '@react-three/drei';
 import ExtrudedWalls from './ExtrudedWalls';
 import DepartmentLabels from './DepartmentLabels';
 import DynamicNavigationRoute from './DynamicNavigationRoute';
+import LiveUserMarker from './LiveUserMarker';
 
 /**
  * Ultra-Smooth Mobile Gesture Controller:
@@ -91,7 +92,7 @@ function DoubleTapOrbitController() {
         s.velocityY = 0;
 
         const timeDiff = now - s.lastTapTime;
-        const dist = Math.hypot(touch.clientX - s.lastTapX, touch.clientY - s.lastTapY);
+        const dist = Math.hypot(touch.clientX - lastTapX, touch.clientY - lastTapY);
 
         // Double-tap detected (second touch within 480ms)
         if (timeDiff > 20 && timeDiff < 480 && dist < 90) {
@@ -172,7 +173,6 @@ function DoubleTapOrbitController() {
 
       if (s.isDoubleTapActive) {
         s.isDoubleTapActive = false;
-        // Keep controls disabled momentarily while momentum glide decays to avoid snapping
       }
     };
 
@@ -192,9 +192,17 @@ function DoubleTapOrbitController() {
 
 /**
  * Assembles the full 3D Canvas scene: lighting, walls, navigation route,
- * department labels, and orbit camera controls.
+ * department labels, live user position marker, and orbit camera controls.
  */
-export default function MapScene({ nodes, routeData, startName, destName }) {
+export default function MapScene({
+  nodes,
+  routeData,
+  startName,
+  destName,
+  liveUserPosition,
+  liveHeading,
+  isTrackingActive,
+}) {
   return (
     <main
       style={{
@@ -209,8 +217,8 @@ export default function MapScene({ nodes, routeData, startName, destName }) {
       <Canvas
         style={{ width: '100%', height: '100%', display: 'block' }}
         camera={{
-          position: [0, 900, 700],
-          fov: 70,
+          position: [0, 950, 1050],
+          fov: 50,
           near: 1,
           far: 6000,
         }}
@@ -247,6 +255,15 @@ export default function MapScene({ nodes, routeData, startName, destName }) {
             />
           )}
           {routeData && <DynamicNavigationRoute routePath={routeData.path} />}
+
+          {/* Live User Movement Marker */}
+          {isTrackingActive && liveUserPosition && (
+            <LiveUserMarker
+              position={liveUserPosition}
+              heading={liveHeading}
+              isActive={isTrackingActive}
+            />
+          )}
         </React.Suspense>
 
         {/* 3D Orbit Controls */}

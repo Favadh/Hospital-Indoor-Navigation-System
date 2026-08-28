@@ -17,12 +17,122 @@
   background: #1e272e;
 }
 
-/* --- Floating QR Scanner Action Button (Full Circle FAB) --- */
-.map-qr-fab {
+/* --- Floating Bottom Controls Wrapper --- */
+.map-bottom-controls {
   position: fixed;
   bottom: 24px;
+  left: 20px;
   right: 20px;
   z-index: 950;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.map-bottom-controls > * {
+  pointer-events: auto;
+}
+
+/* --- Live Sensor Tracking Toggle Button --- */
+.map-sensor-fab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 26px;
+  background: rgba(30, 39, 46, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+}
+
+.map-sensor-fab:hover {
+  background: rgba(45, 52, 54, 0.95);
+  border-color: #00d2d3;
+  transform: translateY(-2px);
+}
+
+.map-sensor-fab.active {
+  background: linear-gradient(135deg, #0984e3 0%, #00cec9 100%);
+  color: #ffffff;
+  border-color: transparent;
+  box-shadow: 0 4px 20px rgba(9, 132, 227, 0.5), 0 0 10px rgba(0, 206, 201, 0.3);
+}
+
+.map-sensor-icon {
+  font-size: 1.1rem;
+}
+
+/* --- Live Sensor Tracking HUD Badge --- */
+.map-live-hud {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(20, 24, 30, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 6px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 210, 211, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.live-hud-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #dfe6e9;
+  font-weight: 600;
+}
+
+.live-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00ff88;
+  box-shadow: 0 0 8px #00ff88;
+  animation: liveDotPulse 1.4s infinite ease-in-out;
+}
+
+@keyframes liveDotPulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.4);
+    opacity: 0.5;
+  }
+}
+
+.btn-simulate-step {
+  background: rgba(0, 210, 211, 0.2);
+  border: 1px solid rgba(0, 210, 211, 0.4);
+  color: #00d2d3;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-simulate-step:hover {
+  background: #00d2d3;
+  color: #000000;
+}
+
+/* --- Floating QR Scanner Action Button (Full Circle FAB) --- */
+.map-qr-fab {
   width: 52px;
   height: 52px;
   border-radius: 50%;
@@ -55,9 +165,18 @@
 }
 
 @media (max-width: 600px) {
-  .map-qr-fab {
+  .map-bottom-controls {
     bottom: 20px;
-    right: 16px;
+    left: 14px;
+    right: 14px;
+  }
+
+  .map-sensor-fab {
+    padding: 8px 12px;
+    font-size: 0.78rem;
+  }
+
+  .map-qr-fab {
     width: 48px;
     height: 48px;
   }
