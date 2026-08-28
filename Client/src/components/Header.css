@@ -1,0 +1,108 @@
+/* --- Floating Glassmorphic Header --- */
+.floating-header {
+  position: fixed;
+  top: 12px;
+  left: 14px;
+  right: 14px;
+  max-width: 1200px;
+  margin: 0 auto;
+  background: rgba(12, 12, 29, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 255, 136, 0.22);
+  border-radius: 14px;
+  padding: 8px 16px;
+  color: #ffffff;
+  z-index: 1000;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 15px rgba(0, 255, 136, 0.08);
+  box-sizing: border-box;
+  transition: all 0.25s ease;
+}
+
+.floating-brand-link {
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.floating-brand-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, #00ff88 0%, #00b894 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  box-shadow: 0 2px 10px rgba(0, 255, 136, 0.4);
+}
+
+.floating-brand-name {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.floating-nav-links {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.floating-nav-item {
+  padding: 6px 14px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.floating-nav-item.active {
+  color: #000000;
+  background: #00ff88;
+  border: 1px solid #00ff88;
+  box-shadow: 0 2px 10px rgba(0, 255, 136, 0.35);
+}
+
+.floating-nav-item.inactive {
+  color: #dcdde1;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.floating-nav-item.inactive:hover {
+  background: rgba(0, 255, 136, 0.12);
+  color: #00ff88;
+  border-color: rgba(0, 255, 136, 0.3);
+}
+
+@media (max-width: 600px) {
+  .floating-header {
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    padding: 6px 12px;
+    border-radius: 12px;
+  }
+
+  .floating-brand-logo {
+    width: 28px;
+    height: 28px;
+    font-size: 0.9rem;
+  }
+
+  .floating-brand-name {
+    font-size: 1.05rem;
+  }
+
+  .floating-nav-item {
+    padding: 5px 10px;
+    font-size: 0.78rem;
+  }
+}

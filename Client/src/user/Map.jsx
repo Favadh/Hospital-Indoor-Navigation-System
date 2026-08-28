@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../utils/axiosInstance';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
 import MapScene from '../components/MapScene';
+import QRScannerModal from '../components/QRScannerModal';
+import MapLoader from '../components/MapLoader';
+import ServerErrorScreen from '../components/ServerErrorScreen';
 import './Map.css';
 
 /**
@@ -11,10 +14,11 @@ import './Map.css';
  * Supports URL search params (?start=...&destination=...) e.g., after QR code scans.
  */
 export default function Map() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [nodes, setNodes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [serverError, setServerError] = useState(false);
+  const [showScannerModal, setShowScannerModal] = useState(false);
 
   // Navigation State
   const [startName, setStartName] = useState(searchParams.get('start') || '');
@@ -23,7 +27,43 @@ export default function Map() {
   const [isNavigating, setIsNavigating] = useState(false);
   const [navError, setNavError] = useState(null);
 
-  // Fetch Nodes from Backend on mount
+  // Trigger Dijkstra Navigation API with custom or current start/dest
+  const handleFindShortestPath = useCallback(
+    async (customStart, customDest) => {
+      const s = customStart || startName;
+      const d = customDest || destName;
+
+      if (!s || !d) return;
+      if (s === d) {
+        setNavError('Start and Destination locations must be different!');
+        return;
+      }
+
+      setIsNavigating(true);
+      setNavError(null);
+
+      try {
+        const res = await api.get('/api/navigation/shortest-path', {
+          params: { start: s, destination: d },
+        });
+
+        if (res.data.success && res.data.path) {
+          setRouteData(res.data);
+        } else {
+          setNavError(res.data.message || 'Path not found');
+          setRouteData(null);
+        }
+      } catch {
+        setNavError('Error connecting to navigation server');
+        setRouteData(null);
+      } finally {
+        setIsNavigating(false);
+      }
+    },
+    [startName, destName]
+  );
+
+  // Fetch Nodes from Backend on mount & auto-calculate if query params exist
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -35,22 +75,28 @@ export default function Map() {
         } else {
           setNodes(fetchedNodes);
 
-          // If startName not provided by URL params, set default
           const queryStart = searchParams.get('start');
           const queryDest = searchParams.get('destination');
 
-          if (!queryStart) {
+          let initialStart = queryStart || '';
+          let initialDest = queryDest || '';
+
+          if (!initialStart) {
             const firstEntrance = fetchedNodes.find((n) => n.type === 'entrance');
-            if (firstEntrance) setStartName(firstEntrance.name);
-          } else {
-            setStartName(queryStart);
+            if (firstEntrance) initialStart = firstEntrance.name;
           }
 
-          if (!queryDest) {
+          if (!initialDest) {
             const firstRoom = fetchedNodes.find((n) => n.type === 'room');
-            if (firstRoom) setDestName(firstRoom.name);
-          } else {
-            setDestName(queryDest);
+            if (firstRoom) initialDest = firstRoom.name;
+          }
+
+          setStartName(initialStart);
+          setDestName(initialDest);
+
+          // If both start and dest were explicitly specified in URL params, auto-calculate route
+          if (queryStart && queryDest && queryStart !== queryDest) {
+            handleFindShortestPath(queryStart, queryDest);
           }
         }
       } catch {
@@ -61,41 +107,11 @@ export default function Map() {
     };
 
     fetchData();
-  }, [searchParams]);
+  }, [searchParams, handleFindShortestPath]);
 
   // Filterable Node Lists for dropdowns
   const selectableStartNodes = nodes.filter((n) => n.type === 'entrance' || n.type === 'room');
   const selectableDestNodes = nodes.filter((n) => n.type === 'room' || n.type === 'entrance');
-
-  // Trigger Dijkstra Navigation API
-  const handleFindShortestPath = async () => {
-    if (!startName || !destName) return;
-    if (startName === destName) {
-      setNavError('Start and Destination locations must be different!');
-      return;
-    }
-
-    setIsNavigating(true);
-    setNavError(null);
-
-    try {
-      const res = await api.get('/api/navigation/shortest-path', {
-        params: { start: startName, destination: destName },
-      });
-
-      if (res.data.success && res.data.path) {
-        setRouteData(res.data);
-      } else {
-        setNavError(res.data.message || 'Path not found');
-        setRouteData(null);
-      }
-    } catch (error) {
-      setNavError('Error connecting to navigation server');
-      setRouteData(null);
-    } finally {
-      setIsNavigating(false);
-    }
-  };
 
   const handleClearRoute = () => {
     setRouteData(null);
@@ -108,38 +124,35 @@ export default function Map() {
     window.location.reload();
   };
 
+  // When QR code is scanned & destination selected in modal
+  const handleScanSuccess = (scanResult) => {
+    setShowScannerModal(false);
+    const start = typeof scanResult === 'object' ? scanResult.start : scanResult;
+    const dest = typeof scanResult === 'object' ? scanResult.destination : '';
+
+    if (start) setStartName(start);
+    if (dest) setDestName(dest);
+
+    if (start && dest && start !== dest) {
+      handleFindShortestPath(start, dest);
+      setSearchParams({ start, destination: dest });
+    } else if (start) {
+      setSearchParams({ start });
+    }
+  };
+
   // Server Down Prompt
   if (serverError) {
-    return (
-      <div className="map-status-overlay">
-        <div className="map-error-card">
-          <div className="map-error-icon">⚠️</div>
-          <h2 className="map-error-title">Server Unreachable</h2>
-          <p className="map-error-desc">
-            Unable to connect to the navigation server. Please make sure the backend is running and try again.
-          </p>
-          <div className="map-error-actions">
-            <button onClick={handleRetry} className="btn-retry">
-              🔄 Retry Connection
-            </button>
-            <Link to="/" className="btn-home">
-              🏠 Go Home
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
+    return <ServerErrorScreen onRetry={handleRetry} homePath="/" />;
   }
 
   // Loading State
   if (isLoading) {
     return (
-      <div className="map-status-overlay">
-        <div className="map-loading-box">
-          <div className="map-spinner-icon">🏥</div>
-          <p className="map-loading-text">Loading 3D Hospital Map...</p>
-        </div>
-      </div>
+      <MapLoader
+        title="Initializing 3D Map"
+        subtitle="Calibrating hospital nodes & pathways..."
+      />
     );
   }
 
@@ -152,7 +165,7 @@ export default function Map() {
         destName={destName}
         onStartChange={setStartName}
         onDestChange={setDestName}
-        onFindRoute={handleFindShortestPath}
+        onFindRoute={() => handleFindShortestPath(startName, destName)}
         onClearRoute={handleClearRoute}
         isNavigating={isNavigating}
         routeData={routeData}
@@ -164,6 +177,25 @@ export default function Map() {
       <MapScene
         nodes={nodes}
         routeData={routeData}
+        startName={startName}
+      />
+
+      {/* Floating QR Scanner Button */}
+      <button
+        className="map-qr-fab"
+        onClick={() => setShowScannerModal(true)}
+        title="Scan Location QR Code"
+        aria-label="Scan Location QR"
+      >
+        <span className="map-qr-fab-icon">📷</span>
+        
+      </button>
+
+      <QRScannerModal
+        isOpen={showScannerModal}
+        onClose={() => setShowScannerModal(false)}
+        onScanSuccess={handleScanSuccess}
+        availableNodes={nodes}
       />
     </div>
   );

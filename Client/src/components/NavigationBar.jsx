@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import './NavigationBar.css';
 
 export default function NavigationBar({
   startName,
@@ -13,134 +14,137 @@ export default function NavigationBar({
   selectableStartNodes,
   selectableDestNodes,
 }) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Auto-collapse to compact HUD pill once route is generated
+  useEffect(() => {
+    if (routeData) {
+      setIsCollapsed(true);
+    }
+  }, [routeData]);
+
+  const handleRouteClick = () => {
+    onFindRoute();
+  };
+
   return (
-    <>
-      <div style={{
-        background: '#161625',
-        padding: '12px 2rem',
-        display: 'flex',
-        gap: '16px',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        zIndex: 9,
-        boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
-        borderBottom: '1px solid #333'
-      }}>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-          {/* Start Location Selector */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '0.75rem', color: '#00ff88', fontWeight: 'bold' }}>🚩 Current Location:</label>
-            <select
-              value={startName}
-              onChange={(e) => onStartChange(e.target.value)}
-              style={{
-                padding: '8px 14px',
-                borderRadius: '6px',
-                background: '#0c0c1d',
-                color: 'white',
-                border: '1px solid #00ff8855',
-                fontSize: '0.88rem',
-                cursor: 'pointer',
-                minWidth: '200px'
-              }}
-            >
-              {selectableStartNodes.map((n, idx) => (
-                <option key={n._id || n.name || idx} value={n.name}>
-                  {n.name} ({n.type})
-                </option>
-              ))}
-            </select>
+    <div className="nav-floating-container">
+      {/* 1. If Route is Active and Collapsed, show ultra-compact HUD Pill */}
+      {routeData && isCollapsed ? (
+        <div className="nav-hud-bar">
+          <div className="nav-hud-info">
+            <span>🚩</span>
+            <span className="nav-hud-route-name">{startName}</span>
+            <span>➔</span>
+            <span>🎯</span>
+            <span className="nav-hud-route-name">{destName}</span>
+            {/* <span className="nav-hud-stats">
+              {routeData.totalDistance}px • {routeData.waypointCount} steps
+            </span> */}
           </div>
 
-          <div style={{ color: '#00ff88', fontWeight: 'bold', fontSize: '1.2rem', marginTop: '14px' }}>➔</div>
-
-          {/* Destination Location Selector */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{ fontSize: '0.75rem', color: '#ff3838', fontWeight: 'bold' }}>🎯 Destination:</label>
-            <select
-              value={destName}
-              onChange={(e) => onDestChange(e.target.value)}
-              style={{
-                padding: '8px 14px',
-                borderRadius: '6px',
-                background: '#0c0c1d',
-                color: 'white',
-                border: '1px solid #ff383855',
-                fontSize: '0.88rem',
-                cursor: 'pointer',
-                minWidth: '200px'
-              }}
-            >
-              {selectableDestNodes.map((n, idx) => (
-                <option key={n._id || n.name || idx} value={n.name}>
-                  {n.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', gap: '10px', marginTop: '18px' }}>
+          <div className="nav-hud-actions">
             <button
-              onClick={onFindRoute}
-              disabled={isNavigating}
-              style={{
-                padding: '8px 20px',
-                borderRadius: '6px',
-                background: '#00ff88',
-                color: '#000',
-                border: 'none',
-                fontWeight: 'bold',
-                fontSize: '0.88rem',
-                cursor: 'pointer',
-                boxShadow: '0 2px 10px rgba(0, 255, 136, 0.4)'
-              }}
+              className="btn-hud-edit"
+              onClick={() => setIsCollapsed(false)}
+              title="Edit Route Locations"
             >
-              {isNavigating ? '⏳ Computing Path...' : '🧭 Find Route'}
+              Edit
             </button>
-
-            {routeData && (
-              <button
-                onClick={onClearRoute}
-                style={{
-                  padding: '8px 16px',
-                  borderRadius: '6px',
-                  background: '#e74c3c',
-                  color: 'white',
-                  border: 'none',
-                  fontWeight: 'bold',
-                  fontSize: '0.88rem',
-                  cursor: 'pointer'
-                }}
-              >
-                ✖ Clear
-              </button>
-            )}
+            <button
+              className="btn-hud-clear"
+              onClick={() => {
+                onClearRoute();
+                setIsCollapsed(false);
+              }}
+              title="Clear Route"
+            >
+              Clear
+            </button>
           </div>
         </div>
+      ) : (
+        /* 2. Full Glassmorphic Navigation Panel */
+        <div className="nav-glass-panel">
+          <div className="nav-form-row">
+            {/* Start & Destination Group */}
+            <div className="nav-select-group">
+              {/* Start Select */}
+              <div className="nav-input-wrapper">
+                <span className="nav-input-icon">🚩</span>
+                <select
+                  value={startName}
+                  onChange={(e) => onStartChange(e.target.value)}
+                  className="nav-select"
+                  aria-label="Start Location"
+                >
+                  {selectableStartNodes.map((n, idx) => (
+                    <option key={n._id || n.name || idx} value={n.name}>
+                      {n.name} ({n.type})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-        {/* HUD Info Badge */}
-        {routeData && (
-          <div style={{
-            background: 'rgba(0, 255, 136, 0.15)',
-            border: '1px solid #00ff88',
-            padding: '8px 16px',
-            borderRadius: '8px',
-            color: 'white',
-            fontSize: '0.85rem'
-          }}>
-            <span style={{ color: '#00ff88', fontWeight: 'bold' }}>Shortest Path Found: </span>
-            <b>{routeData.totalDistance} px</b> | <b>{routeData.waypointCount} Waypoints</b>
+              <span className="nav-arrow-separator">➔</span>
+
+              {/* Destination Select */}
+              <div className="nav-input-wrapper">
+                <span className="nav-input-icon">🎯</span>
+                <select
+                  value={destName}
+                  onChange={(e) => onDestChange(e.target.value)}
+                  className="nav-select dest-select"
+                  aria-label="Destination Location"
+                >
+                  {selectableDestNodes.map((n, idx) => (
+                    <option key={n._id || n.name || idx} value={n.name}>
+                      {n.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Action Buttons Group */}
+            <div className="nav-actions-group">
+              <button
+                onClick={handleRouteClick}
+                disabled={isNavigating}
+                className="btn-find-route"
+              >
+                {isNavigating ? '⏳ Computing...' : '🧭 Find Route'}
+              </button>
+
+              {routeData && (
+                <button
+                  onClick={onClearRoute}
+                  className="btn-clear-route"
+                >
+                  ✖ Clear
+                </button>
+              )}
+
+              {routeData && (
+                <button
+                  onClick={() => setIsCollapsed(true)}
+                  className="btn-toggle-nav"
+                  title="Minimize Panel"
+                >
+                  ▲ Minimize
+                </button>
+              )}
+            </div>
           </div>
-        )}
-      </div>
 
-      {/* Error Banner */}
-      {navError && (
-        <div style={{ background: '#e74c3c', color: 'white', padding: '6px 2rem', fontSize: '0.82rem', textAlign: 'center', fontWeight: 'bold' }}>
-          ⚠️ {navError}
+          {/* Inline Error Toast */}
+          {navError && (
+            <div className="nav-error-toast">
+              <span>⚠️ {navError}</span>
+            </div>
+          )}
         </div>
       )}
-    </>
+    </div>
   );
 }

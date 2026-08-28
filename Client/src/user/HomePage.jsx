@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
+import QRScannerModal from '../components/QRScannerModal';
 import api from '../utils/axiosInstance';
 import './HomePage.css';
 
@@ -8,8 +9,6 @@ export default function HomePage() {
   const navigate = useNavigate();
   const [nodes, setNodes] = useState([]);
   const [showScannerModal, setShowScannerModal] = useState(false);
-  const [manualCode, setManualCode] = useState('');
-  const [scanStatus, setScanStatus] = useState('');
 
   // Fetch list of rooms/entrances for quick navigation buttons
   useEffect(() => {
@@ -22,18 +21,15 @@ export default function HomePage() {
       .catch(() => console.log('Nodes fetch deferred'));
   }, []);
 
-  const handleScanPreset = (locationName) => {
-    setScanStatus(`Scanned: ${locationName}! Redirecting to map...`);
-    setTimeout(() => {
-      setShowScannerModal(false);
-      navigate(`/map?start=${encodeURIComponent(locationName)}`);
-    }, 850);
-  };
-
-  const handleManualScanSubmit = (e) => {
-    e.preventDefault();
-    if (!manualCode.trim()) return;
-    handleScanPreset(manualCode.trim());
+  const handleScanSuccess = (scanResult) => {
+    setShowScannerModal(false);
+    const start = typeof scanResult === 'object' ? scanResult.start : scanResult;
+    const dest = typeof scanResult === 'object' ? scanResult.destination : '';
+    if (dest) {
+      navigate(`/map?start=${encodeURIComponent(start)}&destination=${encodeURIComponent(dest)}`);
+    } else {
+      navigate(`/map?start=${encodeURIComponent(start)}`);
+    }
   };
 
   const popularDestinations = ['ICU', 'Emergency', 'Pharmacy', 'Lab', 'Reception', 'Casuality'];
@@ -60,11 +56,11 @@ export default function HomePage() {
 
         <div className="hero-actions">
           <button className="btn-primary" onClick={() => setShowScannerModal(true)}>
-            <span>📷</span> Scan Location QR
+            Scan Location QR
           </button>
 
           <Link to="/map" className="btn-secondary">
-            <span>🗺️</span> Open 3D Map
+            Open 3D Map
           </Link>
         </div>
       </section>
@@ -209,57 +205,12 @@ export default function HomePage() {
       {/* ===================================================================== */}
       {/* 5. SCANNER MODAL */}
       {/* ===================================================================== */}
-      {showScannerModal && (
-        <div className="modal-overlay">
-          <div className="modal-card">
-            <div className="modal-header">
-              <div className="modal-title-box">
-                <span style={{ fontSize: '1.3rem' }}>📷</span>
-                <h3 style={{ margin: 0, fontSize: '1.2rem', color: '#ffffff' }}>Location QR Scanner</h3>
-              </div>
-              <button className="modal-close" onClick={() => setShowScannerModal(false)}>
-                ✖
-              </button>
-            </div>
-
-            <div className="viewfinder">
-              <div className="laser-line" />
-              <span className="viewfinder-icon">📸</span>
-              <p className="viewfinder-text">
-                {scanStatus || 'Point camera at any Wall QR Code'}
-              </p>
-            </div>
-
-            <div>
-              <p className="preset-label">Or select scanned location:</p>
-              <div className="preset-container">
-                {['Main Entrance', 'Emergency Entrance', 'Pharmacy', 'Cafeteria'].map((loc) => (
-                  <button
-                    key={loc}
-                    className="btn-preset"
-                    onClick={() => handleScanPreset(loc)}
-                  >
-                    📍 {loc}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <form onSubmit={handleManualScanSubmit} className="manual-form">
-              <input
-                type="text"
-                value={manualCode}
-                onChange={(e) => setManualCode(e.target.value)}
-                placeholder="Or enter location (e.g. Main Entrance)"
-                className="input-code"
-              />
-              <button type="submit" className="btn-submit">
-                Go
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      <QRScannerModal
+        isOpen={showScannerModal}
+        onClose={() => setShowScannerModal(false)}
+        onScanSuccess={handleScanSuccess}
+        availableNodes={nodes}
+      />
 
       {/* ===================================================================== */}
       {/* 6. FOOTER */}
