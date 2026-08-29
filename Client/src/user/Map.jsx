@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../utils/axiosInstance';
 import Header from '../components/Header';
@@ -13,12 +13,14 @@ import sensorManager from '../utils/sensorManager';
 import MapMatcher from '../utils/mapMatcher';
 import './Map.css';
 
+function getCardinalDirection(deg) {
+  const directions = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const index = Math.round(((deg % 360) + 360) % 360 / 45) % 8;
+  return directions[index];
+}
+
 /**
  * Map Page — Dedicated 3D Hospital Map & Navigation screen.
- * Supports:
- * - Dijkstra route calculation
- * - In-built Mobile Sensor Live Tracking (PDR, Accelerometer, Magnetometer)
- * - 3D live user position marker & heading cone
  */
 export default function Map() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -26,6 +28,7 @@ export default function Map() {
   const [isLoading, setIsLoading] = useState(true);
   const [serverError, setServerError] = useState(false);
   const [showScannerModal, setShowScannerModal] = useState(false);
+  const [showCalibModal, setShowCalibModal] = useState(false);
 
   // Navigation State
   const [startName, setStartName] = useState(searchParams.get('start') || '');
@@ -41,11 +44,21 @@ export default function Map() {
   const [headingDegrees, setHeadingDegrees] = useState(0);
   const [stepCount, setStepCount] = useState(0);
 
+  // Calibration Parameters
+  const [stepPeakThreshold, setStepPeakThreshold] = useState(1.25);
+  const [baseStepLength, setBaseStepLength] = useState(10.5);
+  const [minStepIntervalMs, setMinStepIntervalMs] = useState(420);
+  const [compassOffset, setCompassOffset] = useState(0);
+  const [maxPathAngleDeg, setMaxPathAngleDeg] = useState(55);
+  const [isPathGatingActive, setIsPathGatingActive] = useState(true);
+  const [liveBounce, setLiveBounce] = useState(0);
+
   const hasInitializedRef = useRef(false);
   const routeDataRef = useRef(routeData);
 
   useEffect(() => {
     routeDataRef.current = routeData;
+    pdrEngine.setActiveRoutePath(routeData?.path || null);
   }, [routeData]);
 
   // Trigger Dijkstra Navigation API
@@ -137,7 +150,6 @@ export default function Map() {
     setStartName(newStart);
     setNavError(null);
 
-    // If live tracking is active, reposition to new start node
     const startNode = nodes.find((n) => n.name === newStart);
     if (startNode) {
       const [wx, wz] = svgToWorld(startNode.x, startNode.y);
@@ -173,7 +185,6 @@ export default function Map() {
       pdrEngine.stop();
       setIsTrackingActive(false);
     } else {
-      // Find starting node world position
       const startNode = nodes.find((n) => n.name === startName) || nodes[0];
       let startX = 0;
       let startZ = 0;
@@ -187,13 +198,10 @@ export default function Map() {
       setLiveUserPos([startX, startZ]);
       setStepCount(0);
 
-      const success = await sensorManager.start();
+      await sensorManager.start();
+      pdrEngine.setActiveRoutePath(routeDataRef.current?.path || null);
       pdrEngine.start(startX, startZ);
       setIsTrackingActive(true);
-
-      if (!success) {
-        console.warn('Sensors simulated or permission not explicitly required');
-      }
     }
   };
 
@@ -202,7 +210,6 @@ export default function Map() {
     if (!isTrackingActive) return;
 
     const unsubPos = pdrEngine.onPosition((pos) => {
-      // Snap to active route or corridor if route exists
       const snapped = MapMatcher.snapToRoute(pos, routeDataRef.current?.path);
       setLiveUserPos([snapped.x, snapped.z]);
     });
@@ -212,23 +219,56 @@ export default function Map() {
     });
 
     const unsubOrientation = sensorManager.onOrientation((headingDeg) => {
-      setLiveHeading((headingDeg * Math.PI) / 180);
-      setHeadingDegrees(Math.round(headingDeg));
+      const aligned = (headingDeg + compassOffset + 360) % 360;
+      setLiveHeading((aligned * Math.PI) / 180);
+      setHeadingDegrees(Math.round(aligned / 2) * 2);
+    });
+
+    const unsubDebug = pdrEngine.onDebug((data) => {
+      setLiveBounce(data.smoothedBounce);
     });
 
     return () => {
       unsubPos();
       unsubStep();
       unsubOrientation();
+      unsubDebug();
     };
-  }, [isTrackingActive]);
+  }, [isTrackingActive, compassOffset]);
+
+  // Adjust Calibration Values
+  const handleSensitivityChange = (val) => {
+    setStepPeakThreshold(val);
+    pdrEngine.setStepPeakThreshold(val);
+  };
+
+  const handleStepLengthChange = (val) => {
+    setBaseStepLength(val);
+    pdrEngine.setBaseStepLength(val);
+  };
+
+  const handleIntervalChange = (val) => {
+    setMinStepIntervalMs(val);
+    pdrEngine.setMinStepIntervalMs(val);
+  };
+
+  const handleAdjustCompass = (deltaDeg) => {
+    const newOffset = (compassOffset + deltaDeg + 360) % 360;
+    setCompassOffset(newOffset);
+    pdrEngine.setCompassOffset(newOffset);
+  };
+
+  const handlePathGatingChange = (active, angle = maxPathAngleDeg) => {
+    setIsPathGatingActive(active);
+    setMaxPathAngleDeg(angle);
+    pdrEngine.setPathGating(active, angle);
+  };
 
   // Step simulation for testing / desktop
   const handleSimulateStep = () => {
-    pdrEngine.simulateStep();
+    pdrEngine.simulateStep(null, baseStepLength);
   };
 
-  // When QR code is scanned & destination selected in modal
   const handleScanSuccess = (scanResult) => {
     setShowScannerModal(false);
     const start = typeof scanResult === 'object' ? scanResult.start : scanResult;
@@ -314,9 +354,21 @@ export default function Map() {
           <div className="map-live-hud">
             <div className="live-hud-badge">
               <span className="live-pulse-dot" />
-              <span className="live-hud-compass">🧭 {headingDegrees}°</span>
+              <span className="live-hud-compass">
+                🧭 {headingDegrees}° {getCardinalDirection(headingDegrees)}
+              </span>
               <span className="live-hud-steps">🚶 {stepCount} steps</span>
             </div>
+
+            {/* Calibration & Tuning Modal Trigger */}
+            <button
+              className="btn-calib-toggle"
+              onClick={() => setShowCalibModal(true)}
+              title="Open Sensor Calibration & Settings"
+            >
+              ⚙️ Tune
+            </button>
+
             {/* Step Simulator Button for Testing */}
             <button
               className="btn-simulate-step"
@@ -357,6 +409,220 @@ export default function Map() {
           </svg>
         </button>
       </div>
+
+      {/* Sensor Calibration & Tuning Modal */}
+      {showCalibModal && (
+        <div className="calib-modal-overlay" onClick={() => setShowCalibModal(false)}>
+          <div className="calib-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="calib-modal-header">
+              <h3>⚙️ Sensor & Movement Tuning</h3>
+              <button className="btn-calib-close" onClick={() => setShowCalibModal(false)}>
+                ✕
+              </button>
+            </div>
+
+            <div className="calib-modal-body">
+              {/* Live Telemetry Meter */}
+              <div className="calib-telemetry-box">
+                <div className="telemetry-label">
+                  <span>Live Body Bounce:</span>
+                  <strong>{liveBounce.toFixed(2)} m/s²</strong>
+                </div>
+                <div className="telemetry-bar-bg">
+                  <div
+                    className="telemetry-bar-fill"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, (liveBounce / 3.0) * 100))}%`,
+                      background: liveBounce >= stepPeakThreshold ? '#00ff88' : '#00d2d3',
+                    }}
+                  />
+                  <div
+                    className="telemetry-threshold-line"
+                    style={{
+                      left: `${Math.min(100, (stepPeakThreshold / 3.0) * 100)}%`,
+                    }}
+                    title={`Trigger Threshold: ${stepPeakThreshold} m/s²`}
+                  />
+                </div>
+                <span className="telemetry-hint">
+                  Green trigger line at {stepPeakThreshold} m/s²
+                </span>
+              </div>
+
+              {/* 1. Step Sensitivity Setting */}
+              <div className="calib-control-group">
+                <div className="calib-control-header">
+                  <label>Step Sensitivity (Peak Threshold):</label>
+                  <span>{stepPeakThreshold} m/s²</span>
+                </div>
+                <input
+                  type="range"
+                  min="0.60"
+                  max="2.20"
+                  step="0.05"
+                  value={stepPeakThreshold}
+                  onChange={(e) => handleSensitivityChange(Number(e.target.value))}
+                  className="calib-slider"
+                />
+                <div className="calib-presets">
+                  <button
+                    className={`btn-preset ${stepPeakThreshold === 0.85 ? 'active' : ''}`}
+                    onClick={() => handleSensitivityChange(0.85)}
+                  >
+                    High (Soft Walk)
+                  </button>
+                  <button
+                    className={`btn-preset ${stepPeakThreshold === 1.25 ? 'active' : ''}`}
+                    onClick={() => handleSensitivityChange(1.25)}
+                  >
+                    Normal (1.25)
+                  </button>
+                  <button
+                    className={`btn-preset ${stepPeakThreshold === 1.65 ? 'active' : ''}`}
+                    onClick={() => handleSensitivityChange(1.65)}
+                  >
+                    Low (Firm Step)
+                  </button>
+                </div>
+              </div>
+
+              {/* 2. Step Stride Distance Setting */}
+              <div className="calib-control-group">
+                <div className="calib-control-header">
+                  <label>Step Stride Distance:</label>
+                  <span>{baseStepLength} map units</span>
+                </div>
+                <input
+                  type="range"
+                  min="4.0"
+                  max="25.0"
+                  step="0.5"
+                  value={baseStepLength}
+                  onChange={(e) => handleStepLengthChange(Number(e.target.value))}
+                  className="calib-slider"
+                />
+                <div className="calib-presets">
+                  <button
+                    className={`btn-preset ${baseStepLength === 7.5 ? 'active' : ''}`}
+                    onClick={() => handleStepLengthChange(7.5)}
+                  >
+                    Small (7.5)
+                  </button>
+                  <button
+                    className={`btn-preset ${baseStepLength === 10.5 ? 'active' : ''}`}
+                    onClick={() => handleStepLengthChange(10.5)}
+                  >
+                    Standard (10.5)
+                  </button>
+                  <button
+                    className={`btn-preset ${baseStepLength === 15.0 ? 'active' : ''}`}
+                    onClick={() => handleStepLengthChange(15.0)}
+                  >
+                    Large (15.0)
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Path Alignment Heading Gating */}
+              <div className="calib-control-group">
+                <div className="calib-control-header">
+                  <label>Corridor Path Forward Angle:</label>
+                  <span>±{maxPathAngleDeg}° {isPathGatingActive ? '(Active)' : '(Off)'}</span>
+                </div>
+                <input
+                  type="range"
+                  min="25"
+                  max="90"
+                  step="5"
+                  value={maxPathAngleDeg}
+                  onChange={(e) => handlePathGatingChange(isPathGatingActive, Number(e.target.value))}
+                  className="calib-slider"
+                />
+                <div className="calib-presets">
+                  <button
+                    className={`btn-preset ${maxPathAngleDeg === 40 ? 'active' : ''}`}
+                    onClick={() => handlePathGatingChange(true, 40)}
+                  >
+                    Strict (±40°)
+                  </button>
+                  <button
+                    className={`btn-preset ${maxPathAngleDeg === 55 ? 'active' : ''}`}
+                    onClick={() => handlePathGatingChange(true, 55)}
+                  >
+                    Natural (±55°)
+                  </button>
+                  <button
+                    className={`btn-preset ${maxPathAngleDeg === 75 ? 'active' : ''}`}
+                    onClick={() => handlePathGatingChange(true, 75)}
+                  >
+                    Wide (±75°)
+                  </button>
+                </div>
+              </div>
+
+              {/* 4. Cadence Lockout Interval */}
+              <div className="calib-control-group">
+                <div className="calib-control-header">
+                  <label>Cadence Lockout (Anti-Double-Trigger):</label>
+                  <span>{minStepIntervalMs} ms</span>
+                </div>
+                <input
+                  type="range"
+                  min="260"
+                  max="650"
+                  step="20"
+                  value={minStepIntervalMs}
+                  onChange={(e) => handleIntervalChange(Number(e.target.value))}
+                  className="calib-slider"
+                />
+              </div>
+
+              {/* 5. Compass Alignment Offset */}
+              <div className="calib-control-group">
+                <div className="calib-control-header">
+                  <label>Building Compass Alignment Offset:</label>
+                  <span>{compassOffset}°</span>
+                </div>
+                <input
+                  type="range"
+                  min="-180"
+                  max="180"
+                  step="5"
+                  value={compassOffset > 180 ? compassOffset - 360 : compassOffset}
+                  onChange={(e) => setCompassOffset(Number(e.target.value))}
+                  className="calib-slider"
+                />
+                <div className="calib-presets">
+                  <button className="btn-preset" onClick={() => handleAdjustCompass(-15)}>
+                    ⟲ -15°
+                  </button>
+                  <button className="btn-preset" onClick={() => handleAdjustCompass(15)}>
+                    ⟳ +15°
+                  </button>
+                  <button className="btn-preset" onClick={() => handleAdjustCompass(180)}>
+                    Flip 180°
+                  </button>
+                  <button
+                    className="btn-preset"
+                    onClick={() => {
+                      setCompassOffset(0);
+                      pdrEngine.setCompassOffset(0);
+                    }}
+                  >
+                    Reset (0°)
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="calib-modal-footer">
+              <button className="btn-calib-done" onClick={() => setShowCalibModal(false)}>
+                ✓ Done & Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <QRScannerModal
         isOpen={showScannerModal}

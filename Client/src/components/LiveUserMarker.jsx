@@ -1,46 +1,70 @@
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 
 /**
- * 3D Live User Marker with:
- * - Real-time position interpolation (smooth step gliding)
- * - Rotating Directional Compass Heading Arrow (facing where the phone points)
- * - Pulsing Radar Floor Beacon
+ * 3D Green Navigation Arrow Marker
+ * - Perfectly aligned with Three.js world axes: Points directly towards -Z (North) at heading = 0.
+ * - Rotates horizontally with silky smooth, zero-lag damping.
  */
 export default function LiveUserMarker({ position, heading = 0, isActive = true }) {
   const groupRef = useRef();
-  const ringRef = useRef();
   const arrowRef = useRef();
+  const ringRef = useRef();
 
-  // Target coordinates for smooth lerping
-  const targetPos = useRef(new THREE.Vector3(position[0], 16, position[1]));
-  const targetRot = useRef(heading);
+  const targetPos = useRef(new THREE.Vector3(position[0], 18, position[1]));
+
+  // Create an extruded 3D Chevron Arrow Shape (Pointing Forward towards -Z)
+  const arrowGeometry = useMemo(() => {
+    const shape = new THREE.Shape();
+    // Tip at +Y in 2D shape (which maps to -Z forward in 3D world after X: -PI/2 rotation)
+    shape.moveTo(0, 26); // Arrow tip
+    shape.lineTo(16, -14);
+    shape.lineTo(6, -8);
+    shape.lineTo(6, -20);
+    shape.lineTo(-6, -20);
+    shape.lineTo(-6, -8);
+    shape.lineTo(-16, -14);
+    shape.closePath();
+
+    const extrudeSettings = {
+      depth: 5,
+      bevelEnabled: true,
+      bevelSegments: 2,
+      steps: 1,
+      bevelSize: 1.2,
+      bevelThickness: 1.2,
+    };
+
+    const geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    geom.center();
+    return geom;
+  }, []);
 
   useFrame((state, delta) => {
     if (!groupRef.current) return;
 
-    // Update targets
-    targetPos.current.set(position[0], 16, position[1]);
-    targetRot.current = heading;
-
-    // Smooth position lerping
+    targetPos.current.set(position[0], 18, position[1]);
     groupRef.current.position.lerp(targetPos.current, Math.min(1, delta * 12));
 
-    // Smooth heading rotation lerping around Y axis
     if (arrowRef.current) {
-      // In Three.js: 0 rad heading = North (-Z), rotate around Y axis
+      // Heading in radians: 0 rad = North (-Z), rotates around world Y axis
+      const currentRot = arrowRef.current.rotation.y;
+      const targetRot = -heading;
+      let diff = ((targetRot - currentRot + Math.PI) % (2 * Math.PI)) - Math.PI;
+      if (diff < -Math.PI) diff += 2 * Math.PI;
+
+      // Responsive smooth rotation
       arrowRef.current.rotation.y = THREE.MathUtils.lerp(
-        arrowRef.current.rotation.y,
-        -heading,
-        Math.min(1, delta * 15)
+        currentRot,
+        currentRot + diff,
+        Math.min(1, delta * 14)
       );
     }
 
-    // Pulse animation on floor ring
     if (ringRef.current) {
       const time = state.clock.getElapsedTime();
-      const scale = 1 + 0.25 * Math.sin(time * 3);
+      const scale = 1 + 0.18 * Math.sin(time * 3);
       ringRef.current.scale.set(scale, scale, 1);
     }
   });
@@ -48,42 +72,22 @@ export default function LiveUserMarker({ position, heading = 0, isActive = true 
   if (!isActive) return null;
 
   return (
-    <group ref={groupRef} position={[position[0], 16, position[1]]}>
-      {/* 1. Pulsing Electric Cyan Radar Ring on Floor */}
+    <group ref={groupRef} position={[position[0], 18, position[1]]}>
+      {/* 1. Floor Pulsing Emerald Glow Ring */}
       <mesh ref={ringRef} position={[0, 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[16, 24, 32]} />
-        <meshBasicMaterial color="#00d2d3" transparent opacity={0.65} side={THREE.DoubleSide} />
+        <ringGeometry args={[14, 22, 32]} />
+        <meshBasicMaterial color="#00ff88" transparent opacity={0.5} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* 2. Central Glowing Location Sphere */}
-      <mesh position={[0, 10, 0]}>
-        <sphereGeometry args={[9, 20, 20]} />
-        <meshStandardMaterial
-          color="#00d2d3"
-          emissive="#00d2d3"
-          emissiveIntensity={2.2}
-        />
-      </mesh>
-
-      {/* 3. Real-Time Directional Compass Arrow (Points where phone is facing) */}
-      <group ref={arrowRef} position={[0, 14, 0]}>
-        {/* Forward Pointer Cone */}
-        <mesh position={[0, 0, -22]} rotation={[-Math.PI / 2, 0, 0]}>
-          <coneGeometry args={[7, 18, 16]} />
+      {/* 2. Forward-Facing Green 3D Navigation Arrow (Rotates Horizontally) */}
+      <group ref={arrowRef} position={[0, 10, 0]}>
+        <mesh geometry={arrowGeometry} rotation={[-Math.PI / 2, 0, 0]}>
           <meshStandardMaterial
-            color="#ff9f43"
-            emissive="#ff9f43"
-            emissiveIntensity={2.0}
-          />
-        </mesh>
-
-        {/* Direction Beam Indicator */}
-        <mesh position={[0, 0, -10]} rotation={[-Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[2.5, 2.5, 14, 12]} />
-          <meshStandardMaterial
-            color="#ff9f43"
-            emissive="#ff9f43"
-            emissiveIntensity={1.5}
+            color="#00ff88"
+            emissive="#00ff88"
+            emissiveIntensity={2.4}
+            roughness={0.15}
+            metalness={0.5}
           />
         </mesh>
       </group>

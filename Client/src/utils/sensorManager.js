@@ -1,8 +1,8 @@
 /**
  * SensorManager — Ingests and normalizes phone in-built motion & orientation sensors
- * - DeviceOrientationEvent (Alpha / Compass Heading / Magnetometer)
- * - DeviceMotionEvent (Linear Acceleration & Accelerometer)
- * - Generic Sensor API (Magnetometer where supported)
+ * - Vector Window Averaging with low latency (5 samples).
+ * - Precise Deadband Filter (1.4°).
+ * - Instant, natural compass response.
  */
 
 class SensorManager {
@@ -14,17 +14,19 @@ class SensorManager {
 
     this.currentHeading = 0; // Degrees (0-360, 0 = North)
     this.filteredHeading = 0; // Smoothed heading
+    this.isInitialized = false;
+
+    // Fast 5-sample vector buffer
+    this.headingVectorBuffer = [];
+    this.vectorBufferSize = 5;
 
     this.handleOrientation = this.handleOrientation.bind(this);
+    this.handleOrientationAbsolute = this.handleOrientationAbsolute.bind(this);
     this.handleMotion = this.handleMotion.bind(this);
   }
 
-  /**
-   * Request permission for iOS 13+ devices and initialize listeners
-   */
   async requestPermission() {
     try {
-      // iOS 13+ DeviceOrientation permission check
       if (
         typeof DeviceOrientationEvent !== 'undefined' &&
         typeof DeviceOrientationEvent.requestPermission === 'function'
@@ -36,7 +38,6 @@ class SensorManager {
         }
       }
 
-      // iOS 13+ DeviceMotion permission check
       if (
         typeof DeviceMotionEvent !== 'undefined' &&
         typeof DeviceMotionEvent.requestPermission === 'function'
@@ -55,31 +56,30 @@ class SensorManager {
     }
   }
 
-  /**
-   * Start listening to device motion and orientation sensors
-   */
   async start() {
     if (this.isListening) return true;
 
-    const granted = await this.requestPermission();
-    if (!granted && typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      return false;
-    }
+    await this.requestPermission();
 
+    if ('ondeviceorientationabsolute' in window) {
+      window.addEventListener('deviceorientationabsolute', this.handleOrientationAbsolute, true);
+    }
     window.addEventListener('deviceorientation', this.handleOrientation, true);
     window.addEventListener('devicemotion', this.handleMotion, true);
 
     this.isListening = true;
+    this.isInitialized = false;
+    this.headingVectorBuffer = [];
     this.notifyStatus({ status: 'active', message: 'Sensors active' });
     return true;
   }
 
-  /**
-   * Stop listening to sensors
-   */
   stop() {
     if (!this.isListening) return;
 
+    if ('ondeviceorientationabsolute' in window) {
+      window.removeEventListener('deviceorientationabsolute', this.handleOrientationAbsolute, true);
+    }
     window.removeEventListener('deviceorientation', this.handleOrientation, true);
     window.removeEventListener('devicemotion', this.handleMotion, true);
 
@@ -87,46 +87,68 @@ class SensorManager {
     this.notifyStatus({ status: 'stopped', message: 'Sensors stopped' });
   }
 
-  /**
-   * Handle phone orientation & magnetometer heading
-   */
-  handleOrientation(event) {
-    let heading = 0;
+  handleOrientationAbsolute(event) {
+    if (event.alpha !== null && event.alpha !== undefined) {
+      const heading = (360 - event.alpha) % 360;
+      this.updateHeading(heading, event);
+    }
+  }
 
-    // 1. iOS Safari webkitCompassHeading (True/Magnetic North in degrees 0-360)
+  handleOrientation(event) {
+    let heading = null;
+
     if (event.webkitCompassHeading !== undefined && event.webkitCompassHeading !== null) {
       heading = event.webkitCompassHeading;
-    }
-    // 2. Android Chrome / Standard alpha (0-360, counter-clockwise)
-    else if (event.alpha !== null && event.alpha !== undefined) {
-      // Convert counter-clockwise alpha to clockwise compass heading
-      heading = 360 - event.alpha;
-      if (event.absolute === false) {
-        // Relative heading fallback
-        heading = (360 - event.alpha) % 360;
-      }
+    } else if (event.alpha !== null && event.alpha !== undefined) {
+      heading = (360 - event.alpha) % 360;
     }
 
-    // Low-pass exponential smoothing filter to remove hand jitter
-    const diff = heading - this.filteredHeading;
-    // Handle wrap-around at 0/360 degrees
-    let normalizedDiff = ((diff + 180) % 360) - 180;
-    if (normalizedDiff < -180) normalizedDiff += 360;
+    if (heading !== null) {
+      this.updateHeading(heading, event);
+    }
+  }
 
-    this.filteredHeading = (this.filteredHeading + normalizedDiff * 0.15 + 360) % 360;
-    this.currentHeading = heading;
+  updateHeading(rawHeading, event) {
+    const rad = (rawHeading * Math.PI) / 180;
+    this.headingVectorBuffer.push({ sin: Math.sin(rad), cos: Math.cos(rad) });
+    if (this.headingVectorBuffer.length > this.vectorBufferSize) {
+      this.headingVectorBuffer.shift();
+    }
+
+    const sumSin = this.headingVectorBuffer.reduce((acc, v) => acc + v.sin, 0);
+    const sumCos = this.headingVectorBuffer.reduce((acc, v) => acc + v.cos, 0);
+    const avgRad = Math.atan2(sumSin, sumCos);
+    const averagedHeading = ((avgRad * 180) / Math.PI + 360) % 360;
+
+    if (!this.isInitialized) {
+      this.filteredHeading = averagedHeading;
+      this.currentHeading = averagedHeading;
+      this.isInitialized = true;
+      this.orientationCallbacks.forEach((cb) => cb(this.filteredHeading, event));
+      return;
+    }
+
+    let diff = ((averagedHeading - this.filteredHeading + 180) % 360) - 180;
+    if (diff < -180) diff += 360;
+
+    const absDiff = Math.abs(diff);
+
+    // Deadband for micro-jitter
+    if (absDiff < 1.4) {
+      return;
+    }
+
+    // Responsive smoothing
+    const alpha = absDiff > 25 ? 0.45 : 0.22;
+
+    this.filteredHeading = (this.filteredHeading + diff * alpha + 360) % 360;
+    this.currentHeading = averagedHeading;
 
     this.orientationCallbacks.forEach((cb) => cb(this.filteredHeading, event));
   }
 
-  /**
-   * Handle accelerometer & gyroscope motion
-   */
   handleMotion(event) {
-    const acc = event.acceleration || event.accelerationIncludingGravity;
-    if (!acc) return;
-
-    this.motionCallbacks.forEach((cb) => cb(acc, event));
+    this.motionCallbacks.forEach((cb) => cb(event));
   }
 
   onOrientation(callback) {

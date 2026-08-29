@@ -27,6 +27,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   pointer-events: none;
 }
 
@@ -52,6 +53,7 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
+  white-space: nowrap;
 }
 
 .map-sensor-fab:hover {
@@ -83,6 +85,7 @@
   border-radius: 20px;
   border: 1px solid rgba(0, 210, 211, 0.3);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  flex-wrap: nowrap;
 }
 
 .live-hud-badge {
@@ -92,6 +95,7 @@
   font-size: 0.8rem;
   color: #dfe6e9;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .live-pulse-dot {
@@ -114,6 +118,24 @@
   }
 }
 
+.btn-calib-toggle {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.btn-calib-toggle:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: #00ff88;
+}
+
 .btn-simulate-step {
   background: rgba(0, 210, 211, 0.2);
   border: 1px solid rgba(0, 210, 211, 0.4);
@@ -124,6 +146,7 @@
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .btn-simulate-step:hover {
@@ -135,6 +158,7 @@
 .map-qr-fab {
   width: 52px;
   height: 52px;
+  min-width: 52px;
   border-radius: 50%;
   padding: 0;
   display: flex;
@@ -164,25 +188,223 @@
   display: block;
 }
 
+/* --- Sensor Calibration & Tuning Modal --- */
+.calib-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.calib-modal-content {
+  background: #232d36;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  width: 100%;
+  max-width: 440px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+}
+
+.calib-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.calib-modal-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #00d2d3;
+}
+
+.btn-calib-close {
+  background: transparent;
+  border: none;
+  color: #a4b0be;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.btn-calib-close:hover {
+  color: #ffffff;
+}
+
+.calib-modal-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Live Telemetry Meter */
+.calib-telemetry-box {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(0, 210, 211, 0.25);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.telemetry-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  margin-bottom: 8px;
+}
+
+.telemetry-label strong {
+  color: #00ff88;
+}
+
+.telemetry-bar-bg {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.telemetry-bar-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.05s linear;
+}
+
+.telemetry-threshold-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #ff4757;
+  z-index: 2;
+}
+
+.telemetry-hint {
+  display: block;
+  font-size: 0.72rem;
+  color: #747d8c;
+  margin-top: 6px;
+}
+
+/* Control Groups */
+.calib-control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.calib-control-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: #dfe6e9;
+}
+
+.calib-control-header span {
+  color: #00d2d3;
+}
+
+.calib-slider {
+  width: 100%;
+  accent-color: #00d2d3;
+  cursor: pointer;
+}
+
+.calib-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.btn-preset {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #ced6e0;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.74rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-preset:hover {
+  background: rgba(0, 210, 211, 0.2);
+  border-color: #00d2d3;
+  color: #ffffff;
+}
+
+.btn-preset.active {
+  background: #00d2d3;
+  color: #000000;
+  border-color: #00d2d3;
+  font-weight: 700;
+}
+
+.calib-modal-footer {
+  padding: 12px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-calib-done {
+  background: linear-gradient(135deg, #00ff88 0%, #00d2d3 100%);
+  color: #000000;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
 @media (max-width: 600px) {
   .map-bottom-controls {
-    bottom: 20px;
-    left: 14px;
-    right: 14px;
+    bottom: 16px;
+    left: 10px;
+    right: 10px;
+    gap: 6px;
   }
 
   .map-sensor-fab {
-    padding: 8px 12px;
-    font-size: 0.78rem;
+    padding: 8px 10px;
+    font-size: 0.75rem;
+  }
+
+  .map-live-hud {
+    padding: 4px 8px;
+    gap: 6px;
+  }
+
+  .live-hud-badge {
+    font-size: 0.72rem;
+    gap: 5px;
   }
 
   .map-qr-fab {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
   }
 
   .map-qr-fab-svg {
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
   }
 }

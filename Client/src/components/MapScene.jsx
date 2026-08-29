@@ -92,10 +92,10 @@ function DoubleTapOrbitController() {
         s.velocityY = 0;
 
         const timeDiff = now - s.lastTapTime;
-        const dist = Math.hypot(touch.clientX - lastTapX, touch.clientY - lastTapY);
+        const dist = Math.hypot(touch.clientX - s.lastTapX, touch.clientY - s.lastTapY);
 
-        // Double-tap detected (second touch within 480ms)
-        if (timeDiff > 20 && timeDiff < 480 && dist < 90) {
+        // Double-tap detected (second touch within 500ms)
+        if (timeDiff > 20 && timeDiff < 500 && dist < 120) {
           s.isDoubleTapActive = true;
           controls.enabled = false;
 
@@ -254,7 +254,13 @@ export default function MapScene({
               routeData={routeData}
             />
           )}
-          {routeData && <DynamicNavigationRoute routePath={routeData.path} />}
+          {routeData && (
+            <DynamicNavigationRoute
+              routePath={routeData.path}
+              liveUserPosition={liveUserPosition}
+              isTrackingActive={isTrackingActive}
+            />
+          )}
 
           {/* Live User Movement Marker */}
           {isTrackingActive && liveUserPosition && (
