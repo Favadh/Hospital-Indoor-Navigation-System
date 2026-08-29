@@ -4,9 +4,10 @@ import { svgToWorld } from '../constants/mapConstants';
 
 /**
  * Robust Pedestrian Dead Reckoning (PDR) Engine
- * - Parametric Polyline Progression: Effortless forward & backward corner wrapping.
- * - Gravity-Projected Vertical Acceleration step detection.
- * - Bidirectional Path Alignment Heading Gating with Corner Lookahead & Lookbehind.
+ * - Soft Magnetic Corridor Guiding: Gently centers the arrow along the hallway centerline.
+ * - Free exploration when walking off-path.
+ * - Bidirectional (forward & backward) movement.
+ * - Preserves exact sensitivity, thresholds, and stride calibrations.
  */
 class PDREngine {
   constructor() {
@@ -28,15 +29,10 @@ class PDREngine {
     this.minStepIntervalMs = 300; // Cadence lockout in ms
     this.gravityAlpha = 0.92;
 
-    // Path Alignment Gating & Corner Lookahead
-    this.isPathGatingActive = true;
-    this.maxPathAngleDeg = 65; // Generous ±65° natural walking cone
+    // Path Guiding & Corridor Centerline Snapping
     this.activeRoutePath = null;
-
-    // Parametric 1D Polyline Progress along active route
-    this.routePolyline = []; // Array of segments with start, end, length, cumDist
-    this.totalRouteLength = 0;
-    this.currentRouteDist = 0;
+    this.corridorSnapRadius = 65; // Distance within which magnetic centerline attraction applies
+    this.centerlineAttraction = 0.20; // 65% magnetic blend to corridor centerline
 
     // State tracking
     this.lastStepTime = 0;
@@ -56,115 +52,11 @@ class PDREngine {
 
   setInitialPosition(x, z) {
     this.currentPosition = { x, z };
-    this.syncRouteDistFromPosition();
     this.notifyPosition();
   }
 
   setActiveRoutePath(routePath) {
     this.activeRoutePath = routePath;
-    this.buildRoutePolyline();
-    this.syncRouteDistFromPosition();
-  }
-
-  /**
-   * Build pre-computed 1D polyline for seamless corner traversal
-   */
-  buildRoutePolyline() {
-    if (!this.activeRoutePath || this.activeRoutePath.length < 2) {
-      this.routePolyline = [];
-      this.totalRouteLength = 0;
-      return;
-    }
-
-    this.routePolyline = [];
-    let cumDist = 0;
-
-    for (let i = 0; i < this.activeRoutePath.length - 1; i++) {
-      const nodeA = this.activeRoutePath[i];
-      const nodeB = this.activeRoutePath[i + 1];
-
-      const [ax, az] = svgToWorld(nodeA.x, nodeA.y);
-      const [bx, bz] = svgToWorld(nodeB.x, nodeB.y);
-
-      const dx = bx - ax;
-      const dz = bz - az;
-      const len = Math.hypot(dx, dz);
-      const heading = Math.atan2(dx, -dz);
-
-      this.routePolyline.push({
-        index: i,
-        ax,
-        az,
-        bx,
-        bz,
-        len,
-        startDist: cumDist,
-        endDist: cumDist + len,
-        heading,
-      });
-
-      cumDist += len;
-    }
-
-    this.totalRouteLength = cumDist;
-  }
-
-  /**
-   * Sync 1D route distance from current (x, z) position
-   */
-  syncRouteDistFromPosition() {
-    if (!this.routePolyline || this.routePolyline.length === 0) return;
-
-    let minDistance = Infinity;
-    let bestDistAlong = 0;
-
-    for (let i = 0; i < this.routePolyline.length; i++) {
-      const seg = this.routePolyline[i];
-      const abx = seg.bx - seg.ax;
-      const abz = seg.bz - seg.az;
-      const apx = this.currentPosition.x - seg.ax;
-      const apz = this.currentPosition.z - seg.az;
-
-      const abLenSq = seg.len * seg.len;
-      let t = abLenSq > 0 ? (apx * abx + apz * abz) / abLenSq : 0;
-      t = Math.max(0, Math.min(1, t));
-
-      const projX = seg.ax + t * abx;
-      const projZ = seg.az + t * abz;
-      const dist = Math.hypot(this.currentPosition.x - projX, this.currentPosition.z - projZ);
-
-      if (dist < minDistance) {
-        minDistance = dist;
-        bestDistAlong = seg.startDist + t * seg.len;
-      }
-    }
-
-    this.currentRouteDist = bestDistAlong;
-  }
-
-  /**
-   * Convert 1D distance along polyline to 3D world (x, z) coordinate
-   */
-  getPositionAtDistance(dist) {
-    if (!this.routePolyline || this.routePolyline.length === 0) {
-      return { ...this.currentPosition };
-    }
-
-    const clampedDist = Math.max(0, Math.min(this.totalRouteLength, dist));
-
-    for (let i = 0; i < this.routePolyline.length; i++) {
-      const seg = this.routePolyline[i];
-      if (clampedDist >= seg.startDist && clampedDist <= seg.endDist) {
-        const segProgress = seg.len > 0 ? (clampedDist - seg.startDist) / seg.len : 0;
-        return {
-          x: seg.ax + segProgress * (seg.bx - seg.ax),
-          z: seg.az + segProgress * (seg.bz - seg.az),
-        };
-      }
-    }
-
-    const lastSeg = this.routePolyline[this.routePolyline.length - 1];
-    return { x: lastSeg.bx, z: lastSeg.bz };
   }
 
   setStepPeakThreshold(val) {
@@ -184,11 +76,6 @@ class PDREngine {
     this.updateComputedHeading();
   }
 
-  setPathGating(active, angleDeg = 65) {
-    this.isPathGatingActive = Boolean(active);
-    this.maxPathAngleDeg = Number(angleDeg);
-  }
-
   start(initialX = 0, initialZ = 0) {
     this.currentPosition = { x: initialX, z: initialZ };
     this.isTracking = true;
@@ -196,9 +83,6 @@ class PDREngine {
     this.lastStepTime = Date.now();
     this.hasGravityEstimate = false;
     this.vertBuffer = [];
-
-    this.buildRoutePolyline();
-    this.syncRouteDistFromPosition();
 
     this.unsubMotion = sensorManager.onMotion(this.handleMotion);
     this.unsubOrientation = sensorManager.onOrientation(this.handleOrientation);
@@ -319,106 +203,34 @@ class PDREngine {
   }
 
   /**
-   * Applies step movement with Bidirectional (Forward & Backward) Polyline Corner Wrapping
+   * Applies step movement with Soft Magnetic Centerline Attraction
    */
-  processStep(stepLength = 12.0) {
+  processStep(stepLength = 22.5) {
     const prevPos = { ...this.currentPosition };
 
-    // 1. If active navigation route polyline is available:
-    if (this.routePolyline && this.routePolyline.length > 0) {
-      // Find current segment along route
-      let currentSegIndex = 0;
-      for (let i = 0; i < this.routePolyline.length; i++) {
-        if (
-          this.currentRouteDist >= this.routePolyline[i].startDist &&
-          this.currentRouteDist <= this.routePolyline[i].endDist
-        ) {
-          currentSegIndex = i;
-          break;
-        }
+    // 1. Raw step displacement along user heading
+    let nextX = this.currentPosition.x + stepLength * Math.sin(this.currentHeading);
+    let nextZ = this.currentPosition.z - stepLength * Math.cos(this.currentHeading);
+
+    // 2. Soft corridor centerline magnetic guide (locks lightly to corridor)
+    if (this.activeRoutePath && this.activeRoutePath.length >= 2) {
+      const snapped = MapMatcher.snapToRoute({ x: nextX, z: nextZ }, this.activeRoutePath, this.corridorSnapRadius);
+
+      if (snapped.isSnapped) {
+        // Gently pull towards corridor centerline while retaining natural movement
+        const blend = this.centerlineAttraction;
+        nextX = nextX + blend * (snapped.x - nextX);
+        nextZ = nextZ + blend * (snapped.z - nextZ);
       }
-
-      const currentSeg = this.routePolyline[currentSegIndex];
-      const nextSeg =
-        currentSegIndex + 1 < this.routePolyline.length
-          ? this.routePolyline[currentSegIndex + 1]
-          : null;
-      const prevSeg =
-        currentSegIndex > 0 ? this.routePolyline[currentSegIndex - 1] : null;
-
-      // Forward alignment with current segment
-      const forwardDiff = Math.abs(
-        ((this.currentHeading - currentSeg.heading + Math.PI) % (2 * Math.PI)) - Math.PI
-      );
-      const forwardDiffDeg = (forwardDiff * 180) / Math.PI;
-
-      // Backward alignment with current segment (turned 180° around)
-      const backwardDiff = Math.abs(
-        ((this.currentHeading - (currentSeg.heading + Math.PI) + Math.PI) % (2 * Math.PI)) - Math.PI
-      );
-      const backwardDiffDeg = (backwardDiff * 180) / Math.PI;
-
-      // Forward corner lookahead
-      let isFacingNextCorner = false;
-      if (nextSeg) {
-        const diffNext = Math.abs(
-          ((this.currentHeading - nextSeg.heading + Math.PI) % (2 * Math.PI)) - Math.PI
-        );
-        const diffNextDeg = (diffNext * 180) / Math.PI;
-        const distToEndOfSeg = currentSeg.endDist - this.currentRouteDist;
-
-        if (distToEndOfSeg < 50 && diffNextDeg <= this.maxPathAngleDeg) {
-          isFacingNextCorner = true;
-        }
-      }
-
-      // Backward corner lookbehind
-      let isFacingPrevCorner = false;
-      if (prevSeg) {
-        const diffPrev = Math.abs(
-          ((this.currentHeading - (prevSeg.heading + Math.PI) + Math.PI) % (2 * Math.PI)) - Math.PI
-        );
-        const diffPrevDeg = (diffPrev * 180) / Math.PI;
-        const distToStartOfSeg = this.currentRouteDist - currentSeg.startDist;
-
-        if (distToStartOfSeg < 50 && diffPrevDeg <= this.maxPathAngleDeg) {
-          isFacingPrevCorner = true;
-        }
-      }
-
-      let stepDelta = 0;
-
-      // 1. Moving Forward along corridor
-      if (forwardDiffDeg <= this.maxPathAngleDeg || isFacingNextCorner) {
-        stepDelta = stepLength;
-      }
-      // 2. Moving Backward along corridor (turned around)
-      else if (backwardDiffDeg <= this.maxPathAngleDeg || isFacingPrevCorner) {
-        stepDelta = -stepLength;
-      }
-      // 3. Facing into a side wall
-      else if (this.isPathGatingActive) {
-        return; // Gated: perpendicular into wall
-      }
-
-      // Advance/Reverse 1D route progress distance smoothly across corners
-      this.currentRouteDist = Math.max(
-        0,
-        Math.min(this.totalRouteLength, this.currentRouteDist + stepDelta)
-      );
-
-      // Convert 1D distance to 3D world coordinate
-      this.currentPosition = this.getPositionAtDistance(this.currentRouteDist);
-    } else {
-      // 2. Free Roaming mode (no route active):
-      const dx = stepLength * Math.sin(this.currentHeading);
-      const dz = -stepLength * Math.cos(this.currentHeading);
-      this.currentPosition.x += dx;
-      this.currentPosition.z += dz;
     }
+
+    this.currentPosition.x = nextX;
+    this.currentPosition.z = nextZ;
 
     const stepData = {
       stepLength,
+      dx: nextX - prevPos.x,
+      dz: nextZ - prevPos.z,
       heading: this.currentHeading,
       headingDeg: (this.currentHeading * 180) / Math.PI,
       from: prevPos,

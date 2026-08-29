@@ -210,8 +210,7 @@ export default function Map() {
     if (!isTrackingActive) return;
 
     const unsubPos = pdrEngine.onPosition((pos) => {
-      const snapped = MapMatcher.snapToRoute(pos, routeDataRef.current?.path);
-      setLiveUserPos([snapped.x, snapped.z]);
+      setLiveUserPos([pos.x, pos.z]);
     });
 
     const unsubStep = pdrEngine.onStep(() => {
