@@ -4,9 +4,9 @@ import { svgToWorld } from '../constants/mapConstants';
 
 /**
  * Robust Pedestrian Dead Reckoning (PDR) Engine
- * - Parametric Polyline Progression: Effortless 1-step corner and turn wrapping.
+ * - Parametric Polyline Progression: Effortless forward & backward corner wrapping.
  * - Gravity-Projected Vertical Acceleration step detection.
- * - Path Alignment Heading Gating with Corner Lookahead.
+ * - Bidirectional Path Alignment Heading Gating with Corner Lookahead & Lookbehind.
  */
 class PDREngine {
   constructor() {
@@ -319,7 +319,7 @@ class PDREngine {
   }
 
   /**
-   * Applies step movement with Effortless Polyline Corner Wrapping
+   * Applies step movement with Bidirectional (Forward & Backward) Polyline Corner Wrapping
    */
   processStep(stepLength = 12.0) {
     const prevPos = { ...this.currentPosition };
@@ -343,14 +343,22 @@ class PDREngine {
         currentSegIndex + 1 < this.routePolyline.length
           ? this.routePolyline[currentSegIndex + 1]
           : null;
+      const prevSeg =
+        currentSegIndex > 0 ? this.routePolyline[currentSegIndex - 1] : null;
 
-      // Check alignment with current segment
-      const diffCurrent = Math.abs(
+      // Forward alignment with current segment
+      const forwardDiff = Math.abs(
         ((this.currentHeading - currentSeg.heading + Math.PI) % (2 * Math.PI)) - Math.PI
       );
-      const diffCurrentDeg = (diffCurrent * 180) / Math.PI;
+      const forwardDiffDeg = (forwardDiff * 180) / Math.PI;
 
-      // Check alignment with upcoming segment around corner
+      // Backward alignment with current segment (turned 180° around)
+      const backwardDiff = Math.abs(
+        ((this.currentHeading - (currentSeg.heading + Math.PI) + Math.PI) % (2 * Math.PI)) - Math.PI
+      );
+      const backwardDiffDeg = (backwardDiff * 180) / Math.PI;
+
+      // Forward corner lookahead
       let isFacingNextCorner = false;
       if (nextSeg) {
         const diffNext = Math.abs(
@@ -359,23 +367,44 @@ class PDREngine {
         const diffNextDeg = (diffNext * 180) / Math.PI;
         const distToEndOfSeg = currentSeg.endDist - this.currentRouteDist;
 
-        // If near corner (< 50 units) and facing the next corridor
         if (distToEndOfSeg < 50 && diffNextDeg <= this.maxPathAngleDeg) {
           isFacingNextCorner = true;
         }
       }
 
-      // If Path Gating is enabled: check if user is facing current or next corridor
-      if (this.isPathGatingActive) {
-        if (diffCurrentDeg > this.maxPathAngleDeg && !isFacingNextCorner) {
-          return; // Gated: facing into a wall
+      // Backward corner lookbehind
+      let isFacingPrevCorner = false;
+      if (prevSeg) {
+        const diffPrev = Math.abs(
+          ((this.currentHeading - (prevSeg.heading + Math.PI) + Math.PI) % (2 * Math.PI)) - Math.PI
+        );
+        const diffPrevDeg = (diffPrev * 180) / Math.PI;
+        const distToStartOfSeg = this.currentRouteDist - currentSeg.startDist;
+
+        if (distToStartOfSeg < 50 && diffPrevDeg <= this.maxPathAngleDeg) {
+          isFacingPrevCorner = true;
         }
       }
 
-      // Advance 1D route progress distance smoothly around corners!
-      this.currentRouteDist = Math.min(
-        this.totalRouteLength,
-        this.currentRouteDist + stepLength
+      let stepDelta = 0;
+
+      // 1. Moving Forward along corridor
+      if (forwardDiffDeg <= this.maxPathAngleDeg || isFacingNextCorner) {
+        stepDelta = stepLength;
+      }
+      // 2. Moving Backward along corridor (turned around)
+      else if (backwardDiffDeg <= this.maxPathAngleDeg || isFacingPrevCorner) {
+        stepDelta = -stepLength;
+      }
+      // 3. Facing into a side wall
+      else if (this.isPathGatingActive) {
+        return; // Gated: perpendicular into wall
+      }
+
+      // Advance/Reverse 1D route progress distance smoothly across corners
+      this.currentRouteDist = Math.max(
+        0,
+        Math.min(this.totalRouteLength, this.currentRouteDist + stepDelta)
       );
 
       // Convert 1D distance to 3D world coordinate
