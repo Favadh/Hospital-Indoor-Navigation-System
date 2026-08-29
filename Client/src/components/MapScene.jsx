@@ -6,6 +6,56 @@ import ExtrudedWalls from './ExtrudedWalls';
 import DepartmentLabels from './DepartmentLabels';
 import DynamicNavigationRoute from './DynamicNavigationRoute';
 import LiveUserMarker from './LiveUserMarker';
+import { svgToWorld } from '../constants/mapConstants';
+
+/**
+ * Camera Controller that positions the camera behind the current start location,
+ * facing directly towards the first corridor node with configurable zoom & height.
+ */
+function NavigationCameraController({
+  routeData,
+  behindDistance = 900,
+  camHeight = 1100,
+  lookAheadDist = 120,
+}) {
+  const { camera } = useThree();
+  const controls = useThree((state) => state.controls);
+
+  useEffect(() => {
+    if (!routeData?.path || routeData.path.length < 2 || !controls) return;
+
+    const path = routeData.path;
+    const startNode = path[0];
+    const firstCorridorNode = path[1];
+
+    const [x0, z0] = svgToWorld(startNode.x, startNode.y);
+    const [x1, z1] = svgToWorld(firstCorridorNode.x, firstCorridorNode.y);
+
+    const dx = x1 - x0;
+    const dz = z1 - z0;
+    const len = Math.hypot(dx, dz) || 1;
+    const dirX = dx / len;
+    const dirZ = dz / len;
+
+    // Target slightly ahead down the hallway
+    const targetX = x0 + dirX * lookAheadDist;
+    const targetY = 15;
+    const targetZ = z0 + dirZ * lookAheadDist;
+
+    // Camera positioned behind start location with specified height & distance
+    const camX = x0 - dirX * behindDistance;
+    const camY = camHeight;
+    const camZ = z0 - dirZ * behindDistance;
+
+    // Apply orientation and update controls
+    controls.target.set(targetX, targetY, targetZ);
+    camera.position.set(camX, camY, camZ);
+    camera.lookAt(targetX, targetY, targetZ);
+    controls.update();
+  }, [routeData, behindDistance, camHeight, lookAheadDist, camera, controls]);
+
+  return null;
+}
 
 /**
  * Ultra-Smooth Mobile Gesture Controller:
@@ -45,7 +95,6 @@ function DoubleTapOrbitController() {
 
     if (s.isDoubleTapActive || hasMomentum) {
       if (!s.isDoubleTapActive && hasMomentum) {
-        // Natural momentum glide after lifting finger
         s.targetTheta += s.velocityX;
         s.targetPhi += s.velocityY;
         s.targetPhi = Math.max(0.05, Math.min(Math.PI / 2.05, s.targetPhi));
@@ -53,7 +102,6 @@ function DoubleTapOrbitController() {
         s.velocityY *= 0.92;
       }
 
-      // Silky-smooth exponential spring damping
       const damp = Math.min(1, 1 - Math.exp(-14 * delta));
       s.currentTheta = THREE.MathUtils.lerp(s.currentTheta, s.targetTheta, damp);
       s.currentPhi = THREE.MathUtils.lerp(s.currentPhi, s.targetPhi, damp);
@@ -65,7 +113,6 @@ function DoubleTapOrbitController() {
       camera.position.copy(controls.target).add(offset);
       camera.lookAt(controls.target);
 
-      // Re-enable controls smoothly once momentum comes to a complete rest
       if (!s.isDoubleTapActive && !hasMomentum) {
         controls.enabled = true;
         controls.update();
@@ -94,12 +141,10 @@ function DoubleTapOrbitController() {
         const timeDiff = now - s.lastTapTime;
         const dist = Math.hypot(touch.clientX - s.lastTapX, touch.clientY - s.lastTapY);
 
-        // Double-tap detected (second touch within 500ms)
         if (timeDiff > 20 && timeDiff < 500 && dist < 120) {
           s.isDoubleTapActive = true;
           controls.enabled = false;
 
-          // Sync current camera angles
           const offset = new THREE.Vector3().copy(camera.position).sub(controls.target);
           const spherical = new THREE.Spherical().setFromVector3(offset);
           s.currentTheta = spherical.theta;
@@ -142,7 +187,6 @@ function DoubleTapOrbitController() {
         s.targetPhi += dPhi;
         s.targetPhi = Math.max(0.05, Math.min(Math.PI / 2.05, s.targetPhi));
 
-        // Velocity tracking with rolling smoothing for natural release momentum
         s.velocityX = s.velocityX * 0.35 + dTheta * 0.65;
         s.velocityY = s.velocityY * 0.35 + dPhi * 0.65;
 
@@ -202,6 +246,8 @@ export default function MapScene({
   liveUserPosition,
   liveHeading,
   isTrackingActive,
+  camBehindDistance = 480,
+  camHeight = 520,
 }) {
   return (
     <main
@@ -288,6 +334,13 @@ export default function MapScene({
             ONE: THREE.TOUCH.PAN,
             TWO: THREE.TOUCH.DOLLY_PAN,
           }}
+        />
+
+        {/* Automatic Initial Camera Orientation on Route Calculation with configurable Zoom */}
+        <NavigationCameraController
+          routeData={routeData}
+          behindDistance={camBehindDistance}
+          camHeight={camHeight}
         />
 
         <DoubleTapOrbitController />

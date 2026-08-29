@@ -20,7 +20,11 @@ function getCardinalDirection(deg) {
 }
 
 /**
- * Map Page — Dedicated 3D Hospital Map & Navigation screen.
+ * Map Page — Dedicated 3D Hospital Map & Navigation screen:
+ * - Automatic Live Sensor Tracking by default.
+ * - Dynamic Re-Routing on path drift.
+ * - Arrival Prompt Modal when destination is reached.
+ * - Configurable Initial Camera Perspective & Zoom Controls.
  */
 export default function Map() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -29,6 +33,7 @@ export default function Map() {
   const [serverError, setServerError] = useState(false);
   const [showScannerModal, setShowScannerModal] = useState(false);
   const [showCalibModal, setShowCalibModal] = useState(false);
+  const [showArrivalModal, setShowArrivalModal] = useState(false);
 
   // Navigation State
   const [startName, setStartName] = useState(searchParams.get('start') || '');
@@ -36,30 +41,57 @@ export default function Map() {
   const [routeData, setRouteData] = useState(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [navError, setNavError] = useState(null);
+  const [rerouteNotification, setRerouteNotification] = useState(null);
+  const [hasArrived, setHasArrived] = useState(false);
 
-  // Live Sensor Tracking State
-  const [isTrackingActive, setIsTrackingActive] = useState(false);
+  // Live Sensor Tracking State (AUTO-STARTED BY DEFAULT)
+  const [isTrackingActive, setIsTrackingActive] = useState(true);
   const [liveUserPos, setLiveUserPos] = useState(null);
   const [liveHeading, setLiveHeading] = useState(0); // in radians
   const [headingDegrees, setHeadingDegrees] = useState(0);
   const [stepCount, setStepCount] = useState(0);
 
   // Calibration Parameters
-  const [stepPeakThreshold, setStepPeakThreshold] = useState(1.25);
-  const [baseStepLength, setBaseStepLength] = useState(10.5);
-  const [minStepIntervalMs, setMinStepIntervalMs] = useState(420);
+  const [stepPeakThreshold, setStepPeakThreshold] = useState(0.1);
+  const [baseStepLength, setBaseStepLength] = useState(22.5);
+  const [minStepIntervalMs, setMinStepIntervalMs] = useState(300);
   const [compassOffset, setCompassOffset] = useState(0);
-  const [maxPathAngleDeg, setMaxPathAngleDeg] = useState(55);
-  const [isPathGatingActive, setIsPathGatingActive] = useState(true);
+  const [maxPathAngleDeg, setMaxPathAngleDeg] = useState(65);
+  const [isPathGatingActive, setIsPathGatingActive] = useState(false);
   const [liveBounce, setLiveBounce] = useState(0);
+
+  // Initial Route Camera Positioning Controls (Zoom & Elevation)
+  const [camBehindDistance, setCamBehindDistance] = useState(550);
+  const [camHeight, setCamHeight] = useState(600);
 
   const hasInitializedRef = useRef(false);
   const routeDataRef = useRef(routeData);
+  const destNameRef = useRef(destName);
+  const startNameRef = useRef(startName);
+  const nodesRef = useRef(nodes);
+  const lastRerouteTimeRef = useRef(0);
+  const hasArrivedRef = useRef(false);
 
   useEffect(() => {
     routeDataRef.current = routeData;
     pdrEngine.setActiveRoutePath(routeData?.path || null);
+    setHasArrived(false);
+    hasArrivedRef.current = false;
   }, [routeData]);
+
+  useEffect(() => {
+    destNameRef.current = destName;
+    setHasArrived(false);
+    hasArrivedRef.current = false;
+  }, [destName]);
+
+  useEffect(() => {
+    startNameRef.current = startName;
+  }, [startName]);
+
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
 
   // Trigger Dijkstra Navigation API
   const computeRoute = async (sName, dName) => {
@@ -74,6 +106,8 @@ export default function Map() {
 
     setIsNavigating(true);
     setNavError(null);
+    setHasArrived(false);
+    hasArrivedRef.current = false;
 
     try {
       const res = await api.get('/api/navigation/shortest-path', {
@@ -94,7 +128,79 @@ export default function Map() {
     }
   };
 
-  // Fetch Nodes once on mount
+  // Check Destination Arrival
+  const checkArrival = (currentPos) => {
+    const currentRoute = routeDataRef.current?.path;
+    const targetDest = destNameRef.current;
+    if (!currentRoute || currentRoute.length < 2 || !targetDest || hasArrivedRef.current) return;
+
+    const destNode = currentRoute[currentRoute.length - 1];
+    const [destWx, destWz] = svgToWorld(destNode.x, destNode.y);
+    const distToDest = Math.hypot(currentPos.x - destWx, currentPos.z - destWz);
+
+    if (distToDest <= 45) {
+      hasArrivedRef.current = true;
+      setHasArrived(true);
+      setShowArrivalModal(true);
+
+      if (navigator.vibrate) {
+        try {
+          navigator.vibrate([120, 80, 200, 100, 300]);
+        } catch {}
+      }
+    }
+  };
+
+  // Dynamic Automatic Re-Routing Trigger (Google Maps style)
+  const checkAndTriggerReroute = (currentPos) => {
+    const currentRoute = routeDataRef.current?.path;
+    const targetDest = destNameRef.current;
+    const currentStart = startNameRef.current;
+    const allNodes = nodesRef.current;
+
+    if (!currentRoute || currentRoute.length < 2 || !targetDest || !allNodes.length || hasArrivedRef.current) return;
+
+    const now = Date.now();
+    if (now - lastRerouteTimeRef.current < 2500) return;
+
+    const snapped = MapMatcher.snapToRoute(currentPos, currentRoute);
+
+    if (snapped.distanceToPath > 85) {
+      let closestNode = null;
+      let minNodeDist = Infinity;
+
+      for (let i = 0; i < allNodes.length; i++) {
+        const n = allNodes[i];
+        if (n.name === targetDest) continue;
+
+        const [wx, wz] = svgToWorld(n.x, n.y);
+        const d = Math.hypot(currentPos.x - wx, currentPos.z - wz);
+
+        if (d < minNodeDist) {
+          minNodeDist = d;
+          closestNode = n;
+        }
+      }
+
+      if (closestNode && closestNode.name !== currentStart && minNodeDist < 160) {
+        lastRerouteTimeRef.current = now;
+        setStartName(closestNode.name);
+        computeRoute(closestNode.name, targetDest);
+        setSearchParams({ start: closestNode.name, destination: targetDest });
+
+        setRerouteNotification(`🔄 Re-routing via ${closestNode.name}...`);
+        setTimeout(() => setRerouteNotification(null), 3000);
+
+        if (navigator.vibrate) {
+          try {
+            navigator.vibrate([40, 50, 40]);
+          } catch {}
+        }
+      }
+    }
+  };
+
+  // Fetch Nodes & Auto-Start Live Movement on Mount
   useEffect(() => {
     if (hasInitializedRef.current) return;
     hasInitializedRef.current = true;
@@ -127,6 +233,21 @@ export default function Map() {
 
           setStartName(initialStart);
           setDestName(initialDest);
+
+          const startNode = fetchedNodes.find((n) => n.name === initialStart) || fetchedNodes[0];
+          let startX = 0;
+          let startZ = 0;
+          if (startNode) {
+            const [wx, wz] = svgToWorld(startNode.x, startNode.y);
+            startX = wx;
+            startZ = wz;
+          }
+
+          setLiveUserPos([startX, startZ]);
+
+          pdrEngine.start(startX, startZ);
+          sensorManager.start().catch(() => {});
+          setIsTrackingActive(true);
 
           if (queryStart && queryDest && queryStart !== queryDest) {
             computeRoute(queryStart, queryDest);
@@ -171,6 +292,7 @@ export default function Map() {
   const handleClearRoute = () => {
     setRouteData(null);
     setNavError(null);
+    setShowArrivalModal(false);
   };
 
   const handleRetry = () => {
@@ -179,38 +301,14 @@ export default function Map() {
     window.location.reload();
   };
 
-  // Toggle In-Built Sensor Live Tracking
-  const toggleLiveTracking = async () => {
-    if (isTrackingActive) {
-      pdrEngine.stop();
-      setIsTrackingActive(false);
-    } else {
-      const startNode = nodes.find((n) => n.name === startName) || nodes[0];
-      let startX = 0;
-      let startZ = 0;
-
-      if (startNode) {
-        const [wx, wz] = svgToWorld(startNode.x, startNode.y);
-        startX = wx;
-        startZ = wz;
-      }
-
-      setLiveUserPos([startX, startZ]);
-      setStepCount(0);
-
-      await sensorManager.start();
-      pdrEngine.setActiveRoutePath(routeDataRef.current?.path || null);
-      pdrEngine.start(startX, startZ);
-      setIsTrackingActive(true);
-    }
-  };
-
-  // Live Position & Step Listeners
+  // Live Position & Step Listeners with Arrival & Re-Routing
   useEffect(() => {
     if (!isTrackingActive) return;
 
     const unsubPos = pdrEngine.onPosition((pos) => {
       setLiveUserPos([pos.x, pos.z]);
+      checkArrival(pos);
+      checkAndTriggerReroute(pos);
     });
 
     const unsubStep = pdrEngine.onStep(() => {
@@ -323,6 +421,40 @@ export default function Map() {
         selectableDestNodes={selectableDestNodes}
       />
 
+      {/* Dynamic Re-Routing Toast Notification */}
+      {rerouteNotification && (
+        <div className="map-reroute-toast">
+          <span>{rerouteNotification}</span>
+        </div>
+      )}
+
+      {/* Destination Arrival Celebratory Modal */}
+      {showArrivalModal && (
+        <div className="arrival-modal-overlay" onClick={() => setShowArrivalModal(false)}>
+          <div className="arrival-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="arrival-icon-wrapper">
+              <span className="arrival-trophy-icon">🎉</span>
+              <div className="arrival-pulse-ring" />
+            </div>
+            <h2 className="arrival-title">You Have Arrived!</h2>
+            <p className="arrival-subtitle">
+              You reached <strong className="arrival-dest-name">{destName}</strong>
+            </p>
+            <div className="arrival-btn-row">
+              <button
+                className="btn-arrival-done"
+                onClick={() => {
+                  setShowArrivalModal(false);
+                  handleClearRoute();
+                }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <MapScene
         nodes={nodes}
         routeData={routeData}
@@ -331,53 +463,40 @@ export default function Map() {
         liveUserPosition={liveUserPos}
         liveHeading={liveHeading}
         isTrackingActive={isTrackingActive}
+        camBehindDistance={camBehindDistance}
+        camHeight={camHeight}
       />
 
       {/* Floating Action Controls */}
       <div className="map-bottom-controls">
-        {/* Live Sensor Tracking Toggle Button */}
-        <button
-          className={`map-sensor-fab ${isTrackingActive ? 'active' : ''}`}
-          onClick={toggleLiveTracking}
-          title={isTrackingActive ? 'Stop Live Sensor Tracking' : 'Start Live Movement Tracking'}
-          aria-label="Toggle Live Sensor Tracking"
-        >
-          <span className="map-sensor-icon">{isTrackingActive ? '📍' : '📡'}</span>
-          <span className="map-sensor-label">
-            {isTrackingActive ? 'Tracking Live' : 'Live Tracking'}
-          </span>
-        </button>
-
-        {/* Live Sensor HUD when Tracking */}
-        {isTrackingActive && (
-          <div className="map-live-hud">
-            <div className="live-hud-badge">
-              <span className="live-pulse-dot" />
-              <span className="live-hud-compass">
-                🧭 {headingDegrees}° {getCardinalDirection(headingDegrees)}
-              </span>
-              <span className="live-hud-steps">🚶 {stepCount} steps</span>
-            </div>
-
-            {/* Calibration & Tuning Modal Trigger */}
-            <button
-              className="btn-calib-toggle"
-              onClick={() => setShowCalibModal(true)}
-              title="Open Sensor Calibration & Settings"
-            >
-              ⚙️ Tune
-            </button>
-
-            {/* Step Simulator Button for Testing */}
-            <button
-              className="btn-simulate-step"
-              onClick={handleSimulateStep}
-              title="Simulate 1 Step Forward"
-            >
-              + Step
-            </button>
+        {/* Live Sensor HUD (Always active by default) */}
+        <div className="map-live-hud">
+          <div className="live-hud-badge">
+            <span className="live-pulse-dot" />
+            <span className="live-hud-compass">
+              🧭 {headingDegrees}° {getCardinalDirection(headingDegrees)}
+            </span>
+            <span className="live-hud-steps">🚶 {stepCount} steps</span>
           </div>
-        )}
+
+          {/* Calibration & Tuning Modal Trigger */}
+          <button
+            className="btn-calib-toggle"
+            onClick={() => setShowCalibModal(true)}
+            title="Open Sensor Calibration & Settings"
+          >
+            ⚙️ Tune
+          </button>
+
+          {/* Step Simulator Button for Testing */}
+          <button
+            className="btn-simulate-step"
+            onClick={handleSimulateStep}
+            title="Simulate 1 Step Forward"
+          >
+            + Step
+          </button>
+        </div>
 
         {/* Floating QR Scanner Button */}
         <button
@@ -414,7 +533,7 @@ export default function Map() {
         <div className="calib-modal-overlay" onClick={() => setShowCalibModal(false)}>
           <div className="calib-modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="calib-modal-header">
-              <h3>⚙️ Sensor & Movement Tuning</h3>
+              <h3>⚙️ Sensor & Camera Tuning</h3>
               <button className="btn-calib-close" onClick={() => setShowCalibModal(false)}>
                 ✕
               </button>
@@ -448,6 +567,68 @@ export default function Map() {
                 </span>
               </div>
 
+              {/* Camera Zoom Out Settings (Initial Perspective) */}
+              <div className="calib-control-group">
+                <div className="calib-control-header">
+                  <label>Initial Camera Distance Behind:</label>
+                  <span>{camBehindDistance} units</span>
+                </div>
+                <input
+                  type="range"
+                  min="200"
+                  max="1200"
+                  step="25"
+                  value={camBehindDistance}
+                  onChange={(e) => setCamBehindDistance(Number(e.target.value))}
+                  className="calib-slider"
+                />
+              </div>
+
+              <div className="calib-control-group">
+                <div className="calib-control-header">
+                  <label>Initial Camera Height (Elevation):</label>
+                  <span>{camHeight} units</span>
+                </div>
+                <input
+                  type="range"
+                  min="250"
+                  max="1400"
+                  step="25"
+                  value={camHeight}
+                  onChange={(e) => setCamHeight(Number(e.target.value))}
+                  className="calib-slider"
+                />
+                <div className="calib-presets">
+                  <button
+                    className={`btn-preset ${camBehindDistance === 320 && camHeight === 360 ? 'active' : ''}`}
+                    onClick={() => {
+                      setCamBehindDistance(320);
+                      setCamHeight(360);
+                    }}
+                  >
+                    Close (320 / 360)
+                  </button>
+                  <button
+                    className={`btn-preset ${camBehindDistance === 550 && camHeight === 600 ? 'active' : ''}`}
+                    onClick={() => {
+                      setCamBehindDistance(550);
+                      setCamHeight(600);
+                    }}
+                  >
+                    Medium (550 / 600)
+                  </button>
+                  <button
+                    className={`btn-preset ${camBehindDistance === 850 && camHeight === 900 ? 'active' : ''}`}
+                    onClick={() => {
+                      setCamBehindDistance(850);
+                      setCamHeight(900);
+                    }}
+                  >
+                    Zoomed Out (850 / 900)
+                  </button>
+                </div>
+              </div>
+
               {/* 1. Step Sensitivity Setting */}
               <div className="calib-control-group">
                 <div className="calib-control-header">
@@ -456,7 +637,7 @@ export default function Map() {
                 </div>
                 <input
                   type="range"
-                  min="0.60"
+                  min="0.05"
                   max="2.20"
                   step="0.05"
                   value={stepPeakThreshold}
@@ -465,22 +646,22 @@ export default function Map() {
                 />
                 <div className="calib-presets">
                   <button
+                    className={`btn-preset ${stepPeakThreshold === 0.1 ? 'active' : ''}`}
+                    onClick={() => handleSensitivityChange(0.1)}
+                  >
+                    High (0.10)
+                  </button>
+                  <button
                     className={`btn-preset ${stepPeakThreshold === 0.85 ? 'active' : ''}`}
                     onClick={() => handleSensitivityChange(0.85)}
                   >
-                    High (Soft Walk)
+                    Medium (0.85)
                   </button>
                   <button
                     className={`btn-preset ${stepPeakThreshold === 1.25 ? 'active' : ''}`}
                     onClick={() => handleSensitivityChange(1.25)}
                   >
                     Normal (1.25)
-                  </button>
-                  <button
-                    className={`btn-preset ${stepPeakThreshold === 1.65 ? 'active' : ''}`}
-                    onClick={() => handleSensitivityChange(1.65)}
-                  >
-                    Low (Firm Step)
                   </button>
                 </div>
               </div>
@@ -494,7 +675,7 @@ export default function Map() {
                 <input
                   type="range"
                   min="4.0"
-                  max="25.0"
+                  max="35.0"
                   step="0.5"
                   value={baseStepLength}
                   onChange={(e) => handleStepLengthChange(Number(e.target.value))}
@@ -502,22 +683,22 @@ export default function Map() {
                 />
                 <div className="calib-presets">
                   <button
-                    className={`btn-preset ${baseStepLength === 7.5 ? 'active' : ''}`}
-                    onClick={() => handleStepLengthChange(7.5)}
+                    className={`btn-preset ${baseStepLength === 12.0 ? 'active' : ''}`}
+                    onClick={() => handleStepLengthChange(12.0)}
                   >
-                    Small (7.5)
+                    Small (12.0)
                   </button>
                   <button
-                    className={`btn-preset ${baseStepLength === 10.5 ? 'active' : ''}`}
-                    onClick={() => handleStepLengthChange(10.5)}
+                    className={`btn-preset ${baseStepLength === 22.5 ? 'active' : ''}`}
+                    onClick={() => handleStepLengthChange(22.5)}
                   >
-                    Standard (10.5)
+                    Current (22.5)
                   </button>
                   <button
-                    className={`btn-preset ${baseStepLength === 15.0 ? 'active' : ''}`}
-                    onClick={() => handleStepLengthChange(15.0)}
+                    className={`btn-preset ${baseStepLength === 30.0 ? 'active' : ''}`}
+                    onClick={() => handleStepLengthChange(30.0)}
                   >
-                    Large (15.0)
+                    Large (30.0)
                   </button>
                 </div>
               </div>
@@ -545,16 +726,16 @@ export default function Map() {
                     Strict (±40°)
                   </button>
                   <button
-                    className={`btn-preset ${maxPathAngleDeg === 55 ? 'active' : ''}`}
-                    onClick={() => handlePathGatingChange(true, 55)}
+                    className={`btn-preset ${maxPathAngleDeg === 65 ? 'active' : ''}`}
+                    onClick={() => handlePathGatingChange(true, 65)}
                   >
-                    Natural (±55°)
+                    Natural (±65°)
                   </button>
                   <button
-                    className={`btn-preset ${maxPathAngleDeg === 75 ? 'active' : ''}`}
-                    onClick={() => handlePathGatingChange(true, 75)}
+                    className={`btn-preset ${!isPathGatingActive ? 'active' : ''}`}
+                    onClick={() => handlePathGatingChange(!isPathGatingActive)}
                   >
-                    Wide (±75°)
+                    {isPathGatingActive ? 'Disable Gating' : 'Enable Gating'}
                   </button>
                 </div>
               </div>
@@ -567,7 +748,7 @@ export default function Map() {
                 </div>
                 <input
                   type="range"
-                  min="260"
+                  min="200"
                   max="650"
                   step="20"
                   value={minStepIntervalMs}
