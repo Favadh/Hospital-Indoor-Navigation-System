@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { Line } from '@react-three/drei';
 import { svgToWorld } from '../constants/mapConstants';
 
@@ -25,11 +26,10 @@ function projectPointOnSegment(px, pz, ax, az, bx, bz) {
 }
 
 /**
- * Renders the navigation route as a progress bar:
- * - Un-traversed path ahead is grey (#576574).
- * - Traversed path behind the user is filled with glowing green (#00ff88).
- * - Strictly follows the corridor centerline: NEVER bends or connects sideways to off-path arrows.
- * - Stops progress if the user drifts away from the corridor.
+ * Renders the navigation route with continuous smooth regression:
+ * - Un-traversed path ahead is glowing green (#00ff88) and smoothly regresses at 60fps.
+ * - Traversed path behind the user is muted grey (#576574).
+ * - Continuous interpolation ensures zero step-jump stuttering.
  */
 export default function DynamicNavigationRoute({
   routePath,
@@ -48,12 +48,42 @@ export default function DynamicNavigationRoute({
   const [startWx, startWz] = svgToWorld(startNode.x, startNode.y);
   const [destWx, destWz] = svgToWorld(destNode.x, destNode.y);
 
-  let completedPoints = [];
-  let remainingPoints = fullPoints3D;
+  // Smooth interpolated position for 60fps continuous line regression
+  const smoothPosRef = useRef(
+    liveUserPosition ? [liveUserPosition[0], liveUserPosition[1]] : [startWx, startWz]
+  );
 
-  if (isTrackingActive && liveUserPosition) {
-    const ux = liveUserPosition[0];
-    const uz = liveUserPosition[1];
+  const [points, setPoints] = useState({
+    completed: [],
+    remaining: fullPoints3D,
+  });
+
+  // Snap position on route change or teleport
+  useEffect(() => {
+    if (liveUserPosition) {
+      const dist = Math.hypot(
+        liveUserPosition[0] - smoothPosRef.current[0],
+        liveUserPosition[1] - smoothPosRef.current[1]
+      );
+      if (dist > 180) {
+        smoothPosRef.current = [liveUserPosition[0], liveUserPosition[1]];
+      }
+    }
+  }, [liveUserPosition, routePath]);
+
+  useFrame((_, delta) => {
+    if (!isTrackingActive || !liveUserPosition) return;
+
+    const targetX = liveUserPosition[0];
+    const targetZ = liveUserPosition[1];
+
+    // Smoothly glide line projection coordinate towards target
+    const lerpFactor = Math.min(1, delta * 8.5);
+    smoothPosRef.current[0] += (targetX - smoothPosRef.current[0]) * lerpFactor;
+    smoothPosRef.current[1] += (targetZ - smoothPosRef.current[1]) * lerpFactor;
+
+    const ux = smoothPosRef.current[0];
+    const uz = smoothPosRef.current[1];
 
     let minDistance = Infinity;
     let closestIndex = 0;
@@ -72,42 +102,46 @@ export default function DynamicNavigationRoute({
       }
     }
 
-    // Only progress if user is within reasonable corridor distance (<= 65 units)
     if (bestProj && minDistance <= 65) {
-      // The projected point directly on the corridor centerline (NEVER bent sideways)
       const projPoint = [bestProj.x, 18, bestProj.z];
 
-      completedPoints = [
+      const newCompleted = [
         ...fullPoints3D.slice(0, closestIndex + 1),
         projPoint,
       ];
 
-      remainingPoints = [
+      const newRemaining = [
         projPoint,
         ...fullPoints3D.slice(closestIndex + 1),
       ];
+
+      setPoints({
+        completed: newCompleted,
+        remaining: newRemaining,
+      });
     } else {
-      // If user drifts far away from path, freeze progression and show straight route
-      remainingPoints = fullPoints3D;
-      completedPoints = [];
+      setPoints({
+        completed: [],
+        remaining: fullPoints3D,
+      });
     }
-  }
+  });
 
   return (
     <group>
       {/* 1. Traversed Path Behind (Muted Grey — already walked) */}
-      {completedPoints && completedPoints.length >= 2 && (
+      {points.completed && points.completed.length >= 2 && (
         <Line
-          points={completedPoints}
-          color="#5765749d"
+          points={points.completed}
+          color="#576574"
           lineWidth={8}
         />
       )}
 
-      {/* 2. Remaining Path Ahead (Glowing Green — regresses as arrow moves) */}
-      {remainingPoints && remainingPoints.length >= 2 && (
+      {/* 2. Remaining Path Ahead (Glowing Green — regresses smoothly) */}
+      {points.remaining && points.remaining.length >= 2 && (
         <Line
-          points={remainingPoints}
+          points={points.remaining}
           color="#00ff88"
           lineWidth={10}
         />
