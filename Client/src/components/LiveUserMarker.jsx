@@ -76,18 +76,18 @@ export default function LiveUserMarker({ position, heading = 0, isActive = true 
       {/* 1. Floor Pulsing Emerald Glow Ring */}
       <mesh ref={ringRef} position={[0, 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <ringGeometry args={[14, 22, 32]} />
-        <meshBasicMaterial color="#00ff88" transparent opacity={0.5} side={THREE.DoubleSide} />
+        <meshBasicMaterial color="#009c65" transparent opacity={0.5} side={THREE.DoubleSide} />
       </mesh>
 
       {/* 2. Forward-Facing Green 3D Navigation Arrow (Rotates Horizontally) */}
       <group ref={arrowRef} position={[0, 10, 0]}>
         <mesh geometry={arrowGeometry} rotation={[-Math.PI / 2, 0, 0]}>
           <meshStandardMaterial
-            color="#00ff88"
-            emissive="#00ff88"
-            emissiveIntensity={2.4}
-            roughness={0.15}
-            metalness={0.5}
+            color="#007515"
+            emissive="#0000003b"
+            emissiveIntensity={0.4}
+            roughness={0.85}
+            metalness={0.0}
           />
         </mesh>
       </group>

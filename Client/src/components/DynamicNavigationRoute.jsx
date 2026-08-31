@@ -95,19 +95,19 @@ export default function DynamicNavigationRoute({
 
   return (
     <group>
-      {/* 1. Remaining Path Ahead (Muted Grey) */}
-      {remainingPoints && remainingPoints.length >= 2 && (
+      {/* 1. Traversed Path Behind (Muted Grey — already walked) */}
+      {completedPoints && completedPoints.length >= 2 && (
         <Line
-          points={remainingPoints}
-          color="#576574"
+          points={completedPoints}
+          color="#5765749d"
           lineWidth={8}
         />
       )}
 
-      {/* 2. Traversed Path Behind (Glowing Emerald Green Progress Bar) */}
-      {completedPoints && completedPoints.length >= 2 && (
+      {/* 2. Remaining Path Ahead (Glowing Green — regresses as arrow moves) */}
+      {remainingPoints && remainingPoints.length >= 2 && (
         <Line
-          points={completedPoints}
+          points={remainingPoints}
           color="#00ff88"
           lineWidth={10}
         />
