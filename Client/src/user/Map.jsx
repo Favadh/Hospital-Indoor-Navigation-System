@@ -64,6 +64,9 @@ export default function Map() {
   const [camBehindDistance, setCamBehindDistance] = useState(550);
   const [camHeight, setCamHeight] = useState(600);
 
+  // Track-Up Camera Follow Mode (Google Maps style)
+  const [isTrackUpActive, setIsTrackUpActive] = useState(false);
+
   const hasInitializedRef = useRef(false);
   const routeDataRef = useRef(routeData);
   const destNameRef = useRef(destName);
@@ -465,6 +468,8 @@ export default function Map() {
         isTrackingActive={isTrackingActive}
         camBehindDistance={camBehindDistance}
         camHeight={camHeight}
+        isTrackUpActive={isTrackUpActive}
+        onTrackUpDisengage={() => setIsTrackUpActive(false)}
       />
 
       {/* Floating Action Controls */}
@@ -498,34 +503,63 @@ export default function Map() {
           </button>
         </div>
 
-        {/* Floating QR Scanner Button */}
-        <button
-          className="map-qr-fab"
-          onClick={() => setShowScannerModal(true)}
-          title="Scan Location QR Code"
-          aria-label="Scan Location QR"
-        >
-          <svg
-            className="map-qr-fab-svg"
-            viewBox="0 0 24 24"
-            width="24"
-            height="24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        {/* Right-side Floating Action Buttons (stacked vertically) */}
+        <div className="map-right-fabs">
+          {/* Track-Up Compass Follow Button */}
+          <button
+            className={`map-trackup-fab ${isTrackUpActive ? 'active' : ''}`}
+            onClick={() => setIsTrackUpActive((prev) => !prev)}
+            title="Track-Up: Follow arrow direction"
+            aria-label="Track-Up Follow Mode"
           >
-            <path d="M3 7V5a2 2 0 0 1 2-2h2" />
-            <path d="M17 3h2a2 2 0 0 1 2 2v2" />
-            <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
-            <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
-            <line x1="3" y1="12" x2="21" y2="12" strokeWidth="2" strokeDasharray="2 2" />
-            <rect x="7" y="7" width="2" height="2" fill="currentColor" />
-            <rect x="15" y="7" width="2" height="2" fill="currentColor" />
-            <rect x="7" y="15" width="2" height="2" fill="currentColor" />
-          </svg>
-        </button>
+            <svg
+              className="map-trackup-fab-svg"
+              viewBox="0 0 24 24"
+              width="24"
+              height="24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {/* Compass needle pointing North */}
+              <circle cx="12" cy="12" r="10" />
+              <polygon points="12,2 14.5,10 12,8.5 9.5,10" fill="currentColor" stroke="none" />
+              <polygon points="12,22 9.5,14 12,15.5 14.5,14" fill="none" stroke="currentColor" strokeWidth="1.5" />
+              <circle cx="12" cy="12" r="1.5" fill="currentColor" />
+            </svg>
+          </button>
+
+          {/* Floating QR Scanner Button */}
+          <button
+            className="map-qr-fab"
+            onClick={() => setShowScannerModal(true)}
+            title="Scan Location QR Code"
+            aria-label="Scan Location QR"
+          >
+            <svg
+              className="map-qr-fab-svg"
+              viewBox="0 0 24 24"
+              width="24"
+              height="24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M3 7V5a2 2 0 0 1 2-2h2" />
+              <path d="M17 3h2a2 2 0 0 1 2 2v2" />
+              <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
+              <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
+              <line x1="3" y1="12" x2="21" y2="12" strokeWidth="2" strokeDasharray="2 2" />
+              <rect x="7" y="7" width="2" height="2" fill="currentColor" />
+              <rect x="15" y="7" width="2" height="2" fill="currentColor" />
+              <rect x="7" y="15" width="2" height="2" fill="currentColor" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Sensor Calibration & Tuning Modal */}

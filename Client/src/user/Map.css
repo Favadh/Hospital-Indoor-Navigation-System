@@ -285,6 +285,56 @@
   color: #000000;
 }
 
+/* --- Right-Side Stacked Floating Action Buttons (Compass + QR) --- */
+.map-right-fabs {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+/* --- Track-Up Compass Follow Button --- */
+.map-trackup-fab {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  border-radius: 50%;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 24, 30, 0.92);
+  color: #8899aa;
+  border: 1.5px solid rgba(136, 153, 170, 0.35);
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.map-trackup-fab.active {
+  background: linear-gradient(135deg, #0066ff 0%, #00aaff 100%);
+  color: #ffffff;
+  border-color: rgba(0, 170, 255, 0.6);
+  box-shadow: 0 4px 20px rgba(0, 102, 255, 0.55), 0 0 12px rgba(0, 170, 255, 0.35);
+}
+
+.map-trackup-fab:hover {
+  transform: translateY(-2px) scale(1.05);
+}
+
+.map-trackup-fab:active {
+  transform: translateY(0) scale(0.95);
+}
+
+.map-trackup-fab-svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
 /* --- Floating QR Scanner Action Button (Full Circle FAB) --- */
 .map-qr-fab {
   width: 52px;
@@ -530,6 +580,17 @@
   }
 
   .map-qr-fab-svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .map-trackup-fab {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+  }
+
+  .map-trackup-fab-svg {
     width: 20px;
     height: 20px;
   }

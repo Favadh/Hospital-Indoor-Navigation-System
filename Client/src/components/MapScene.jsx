@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
@@ -58,12 +58,113 @@ function NavigationCameraController({
 }
 
 /**
+ * Track-Up Camera Controller (Google Maps style):
+ * - Camera follows the live arrow marker, always looking in the direction of movement.
+ * - Smoothly rotates the entire 3D scene so "up" = direction of travel.
+ * - Auto-disengages on user pan/rotate/zoom gestures.
+ * - Re-engages and re-centres when the Track-Up FAB button is clicked.
+ */
+function TrackUpCameraController({
+  liveUserPosition,
+  liveHeading,
+  isTrackUpActive,
+  onUserInteraction,
+  trackUpDistance = 500,
+  trackUpHeight = 600,
+  trackUpLookAhead = 100,
+}) {
+  const { camera } = useThree();
+  const controls = useThree((state) => state.controls);
+
+  const smoothCamPos = useRef(new THREE.Vector3());
+  const smoothTarget = useRef(new THREE.Vector3());
+  const hasSnapped = useRef(false);
+  const interactionDetected = useRef(false);
+
+  // Detect user manual interaction (pan/rotate/zoom) on OrbitControls
+  useEffect(() => {
+    if (!controls) return;
+
+    const handleStart = () => {
+      if (isTrackUpActive) {
+        interactionDetected.current = true;
+      }
+    };
+
+    controls.addEventListener('start', handleStart);
+    return () => {
+      controls.removeEventListener('start', handleStart);
+    };
+  }, [controls, isTrackUpActive]);
+
+  // When Track-Up is toggled off externally, reset snap flag
+  useEffect(() => {
+    if (!isTrackUpActive) {
+      hasSnapped.current = false;
+    }
+  }, [isTrackUpActive]);
+
+  useFrame((_, delta) => {
+    if (!controls || !isTrackUpActive || !liveUserPosition) return;
+
+    // If user touched the screen while track-up was on, disengage
+    if (interactionDetected.current) {
+      interactionDetected.current = false;
+      if (onUserInteraction) onUserInteraction();
+      return;
+    }
+
+    const [ux, uz] = liveUserPosition;
+
+    // Direction the user is facing (heading is in radians, 0 = north = -Z in Three.js)
+    const dirX = Math.sin(liveHeading);
+    const dirZ = -Math.cos(liveHeading);
+
+    // Desired camera position: behind the user along their heading
+    const desiredCamX = ux - dirX * trackUpDistance;
+    const desiredCamY = trackUpHeight;
+    const desiredCamZ = uz - dirZ * trackUpDistance;
+
+    // Desired look-at target: ahead of user along their heading
+    const desiredTargetX = ux + dirX * trackUpLookAhead;
+    const desiredTargetY = 15;
+    const desiredTargetZ = uz + dirZ * trackUpLookAhead;
+
+    // First frame: snap instantly
+    if (!hasSnapped.current) {
+      smoothCamPos.current.set(desiredCamX, desiredCamY, desiredCamZ);
+      smoothTarget.current.set(desiredTargetX, desiredTargetY, desiredTargetZ);
+      hasSnapped.current = true;
+    }
+
+    // Smooth interpolation — heavier damping for rock-solid following
+    const followDamp = Math.min(1, 1 - Math.exp(-3.5 * delta));
+
+    smoothCamPos.current.x += (desiredCamX - smoothCamPos.current.x) * followDamp;
+    smoothCamPos.current.y += (desiredCamY - smoothCamPos.current.y) * followDamp;
+    smoothCamPos.current.z += (desiredCamZ - smoothCamPos.current.z) * followDamp;
+
+    smoothTarget.current.x += (desiredTargetX - smoothTarget.current.x) * followDamp;
+    smoothTarget.current.y += (desiredTargetY - smoothTarget.current.y) * followDamp;
+    smoothTarget.current.z += (desiredTargetZ - smoothTarget.current.z) * followDamp;
+
+    // Apply to camera & controls
+    camera.position.copy(smoothCamPos.current);
+    controls.target.copy(smoothTarget.current);
+    camera.lookAt(smoothTarget.current);
+    controls.update();
+  });
+
+  return null;
+}
+
+/**
  * Ultra-Smooth Mobile Gesture Controller:
  * 1. Single-Finger Drag: Physics-damped Pan.
  * 2. Double-Tap and Hold & Drag: Silky 3D Orbit with velocity momentum & smooth glide.
  * 3. Two-Finger Pinch: Smooth Zoom.
  */
-function DoubleTapOrbitController() {
+function DoubleTapOrbitController({ onUserInteraction }) {
   const { gl, camera } = useThree();
   const controls = useThree((state) => state.controls);
 
@@ -144,6 +245,9 @@ function DoubleTapOrbitController() {
         if (timeDiff > 20 && timeDiff < 500 && dist < 120) {
           s.isDoubleTapActive = true;
           controls.enabled = false;
+
+          // Notify parent that user is interacting
+          if (onUserInteraction) onUserInteraction();
 
           const offset = new THREE.Vector3().copy(camera.position).sub(controls.target);
           const spherical = new THREE.Spherical().setFromVector3(offset);
@@ -229,7 +333,7 @@ function DoubleTapOrbitController() {
       domElement.removeEventListener('touchmove', handleTouchMove, { capture: true });
       window.removeEventListener('touchend', handleTouchEnd, { capture: true });
     };
-  }, [gl, camera, controls]);
+  }, [gl, camera, controls, onUserInteraction]);
 
   return null;
 }
@@ -248,7 +352,19 @@ export default function MapScene({
   isTrackingActive,
   camBehindDistance = 480,
   camHeight = 520,
+  isTrackUpActive = false,
+  onTrackUpDisengage,
 }) {
+  // Memoize the disengage callback to avoid re-renders
+  const disengageRef = useRef(onTrackUpDisengage);
+  useEffect(() => {
+    disengageRef.current = onTrackUpDisengage;
+  }, [onTrackUpDisengage]);
+
+  const handleUserInteraction = useCallback(() => {
+    if (disengageRef.current) disengageRef.current();
+  }, []);
+
   return (
     <main
       style={{
@@ -343,7 +459,15 @@ export default function MapScene({
           camHeight={camHeight}
         />
 
-        <DoubleTapOrbitController />
+        {/* Track-Up Follow Camera (Google Maps style) */}
+        <TrackUpCameraController
+          liveUserPosition={liveUserPosition}
+          liveHeading={liveHeading}
+          isTrackUpActive={isTrackUpActive}
+          onUserInteraction={handleUserInteraction}
+        />
+
+        <DoubleTapOrbitController onUserInteraction={handleUserInteraction} />
       </Canvas>
     </main>
   );
