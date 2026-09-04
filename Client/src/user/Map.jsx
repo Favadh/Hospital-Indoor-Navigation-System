@@ -10,7 +10,6 @@ import ServerErrorScreen from '../components/ServerErrorScreen';
 import { svgToWorld } from '../constants/mapConstants';
 import pdrEngine from '../utils/pdrEngine';
 import sensorManager from '../utils/sensorManager';
-import MapMatcher from '../utils/mapMatcher';
 import './Map.css';
 
 function getCardinalDirection(deg) {
@@ -21,10 +20,11 @@ function getCardinalDirection(deg) {
 
 /**
  * Map Page — Dedicated 3D Hospital Map & Navigation screen:
- * - Automatic Live Sensor Tracking by default.
- * - Dynamic Re-Routing on path drift.
+ * - 100% Path-Locked Marker Progression (Zero Drift).
+ * - Automatic Initial Compass Calibration.
+ * - Directional Step Gating (Forward & Backward).
  * - Arrival Prompt Modal when destination is reached.
- * - Configurable Initial Camera Perspective & Zoom Controls.
+ * - Track-Up Follow Camera & Configurable Zoom.
  */
 export default function Map() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -41,7 +41,6 @@ export default function Map() {
   const [routeData, setRouteData] = useState(null);
   const [isNavigating, setIsNavigating] = useState(false);
   const [navError, setNavError] = useState(null);
-  const [rerouteNotification, setRerouteNotification] = useState(null);
   const [hasArrived, setHasArrived] = useState(false);
 
   // Live Sensor Tracking State (AUTO-STARTED BY DEFAULT)
@@ -56,8 +55,6 @@ export default function Map() {
   const [baseStepLength, setBaseStepLength] = useState(22.5);
   const [minStepIntervalMs, setMinStepIntervalMs] = useState(300);
   const [compassOffset, setCompassOffset] = useState(0);
-  const [maxPathAngleDeg, setMaxPathAngleDeg] = useState(65);
-  const [isPathGatingActive, setIsPathGatingActive] = useState(false);
   const [liveBounce, setLiveBounce] = useState(0);
 
   // Initial Route Camera Positioning Controls (Zoom & Elevation)
@@ -72,7 +69,6 @@ export default function Map() {
   const destNameRef = useRef(destName);
   const startNameRef = useRef(startName);
   const nodesRef = useRef(nodes);
-  const lastRerouteTimeRef = useRef(0);
   const hasArrivedRef = useRef(false);
 
   useEffect(() => {
@@ -141,7 +137,7 @@ export default function Map() {
     const [destWx, destWz] = svgToWorld(destNode.x, destNode.y);
     const distToDest = Math.hypot(currentPos.x - destWx, currentPos.z - destWz);
 
-    if (distToDest <= 45) {
+    if (distToDest <= 35) {
       hasArrivedRef.current = true;
       setHasArrived(true);
       setShowArrivalModal(true);
@@ -150,55 +146,6 @@ export default function Map() {
         try {
           navigator.vibrate([120, 80, 200, 100, 300]);
         } catch {}
-      }
-    }
-  };
-
-  // Dynamic Automatic Re-Routing Trigger (Google Maps style)
-  const checkAndTriggerReroute = (currentPos) => {
-    const currentRoute = routeDataRef.current?.path;
-    const targetDest = destNameRef.current;
-    const currentStart = startNameRef.current;
-    const allNodes = nodesRef.current;
-
-    if (!currentRoute || currentRoute.length < 2 || !targetDest || !allNodes.length || hasArrivedRef.current) return;
-
-    const now = Date.now();
-    if (now - lastRerouteTimeRef.current < 2500) return;
-
-    const snapped = MapMatcher.snapToRoute(currentPos, currentRoute);
-
-    if (snapped.distanceToPath > 85) {
-      let closestNode = null;
-      let minNodeDist = Infinity;
-
-      for (let i = 0; i < allNodes.length; i++) {
-        const n = allNodes[i];
-        if (n.name === targetDest) continue;
-
-        const [wx, wz] = svgToWorld(n.x, n.y);
-        const d = Math.hypot(currentPos.x - wx, currentPos.z - wz);
-
-        if (d < minNodeDist) {
-          minNodeDist = d;
-          closestNode = n;
-        }
-      }
-
-      if (closestNode && closestNode.name !== currentStart && minNodeDist < 160) {
-        lastRerouteTimeRef.current = now;
-        setStartName(closestNode.name);
-        computeRoute(closestNode.name, targetDest);
-        setSearchParams({ start: closestNode.name, destination: targetDest });
-
-        setRerouteNotification(`🔄 Re-routing via ${closestNode.name}...`);
-        setTimeout(() => setRerouteNotification(null), 3000);
-
-        if (navigator.vibrate) {
-          try {
-            navigator.vibrate([40, 50, 40]);
-          } catch {}
-        }
       }
     }
   };
@@ -296,6 +243,7 @@ export default function Map() {
     setRouteData(null);
     setNavError(null);
     setShowArrivalModal(false);
+    pdrEngine.setActiveRoutePath(null);
   };
 
   const handleRetry = () => {
@@ -304,24 +252,23 @@ export default function Map() {
     window.location.reload();
   };
 
-  // Live Position & Step Listeners with Arrival & Re-Routing
+  // Live Position & Step Listeners with Arrival
   useEffect(() => {
     if (!isTrackingActive) return;
 
     const unsubPos = pdrEngine.onPosition((pos) => {
       setLiveUserPos([pos.x, pos.z]);
+      if (pos.heading !== undefined) {
+        setLiveHeading(pos.heading);
+      }
+      if (pos.headingDeg !== undefined) {
+        setHeadingDegrees(Math.round(pos.headingDeg / 2) * 2);
+      }
       checkArrival(pos);
-      checkAndTriggerReroute(pos);
     });
 
-    const unsubStep = pdrEngine.onStep(() => {
-      setStepCount((prev) => prev + 1);
-    });
-
-    const unsubOrientation = sensorManager.onOrientation((headingDeg) => {
-      const aligned = (headingDeg + compassOffset + 360) % 360;
-      setLiveHeading((aligned * Math.PI) / 180);
-      setHeadingDegrees(Math.round(aligned / 2) * 2);
+    const unsubStep = pdrEngine.onStep((stepData) => {
+      setStepCount(stepData.steps);
     });
 
     const unsubDebug = pdrEngine.onDebug((data) => {
@@ -331,10 +278,9 @@ export default function Map() {
     return () => {
       unsubPos();
       unsubStep();
-      unsubOrientation();
       unsubDebug();
     };
-  }, [isTrackingActive, compassOffset]);
+  }, [isTrackingActive]);
 
   // Adjust Calibration Values
   const handleSensitivityChange = (val) => {
@@ -358,15 +304,9 @@ export default function Map() {
     pdrEngine.setCompassOffset(newOffset);
   };
 
-  const handlePathGatingChange = (active, angle = maxPathAngleDeg) => {
-    setIsPathGatingActive(active);
-    setMaxPathAngleDeg(angle);
-    pdrEngine.setPathGating(active, angle);
-  };
-
   // Step simulation for testing / desktop
   const handleSimulateStep = () => {
-    pdrEngine.simulateStep(null, baseStepLength);
+    pdrEngine.simulateStep();
   };
 
   const handleScanSuccess = (scanResult) => {
@@ -424,13 +364,6 @@ export default function Map() {
         selectableDestNodes={selectableDestNodes}
       />
 
-      {/* Dynamic Re-Routing Toast Notification */}
-      {rerouteNotification && (
-        <div className="map-reroute-toast">
-          <span>{rerouteNotification}</span>
-        </div>
-      )}
-
       {/* Destination Arrival Celebratory Modal */}
       {showArrivalModal && (
         <div className="arrival-modal-overlay" onClick={() => setShowArrivalModal(false)}>
@@ -484,14 +417,14 @@ export default function Map() {
             <span className="live-hud-steps">🚶 {stepCount} steps</span>
           </div>
 
-          {/* Calibration & Tuning Modal Trigger */}
-          <button
+          {/* Calibration & Tuning Modal Trigger (Disabled for now) */}
+          {/* <button
             className="btn-calib-toggle"
             onClick={() => setShowCalibModal(true)}
             title="Open Sensor Calibration & Settings"
           >
             ⚙️ Tune
-          </button>
+          </button> */}
 
           {/* Step Simulator Button for Testing */}
           <button
@@ -523,7 +456,6 @@ export default function Map() {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              {/* Compass needle pointing North */}
               <circle cx="12" cy="12" r="10" />
               <polygon points="12,2 14.5,10 12,8.5 9.5,10" fill="currentColor" stroke="none" />
               <polygon points="12,22 9.5,14 12,15.5 14.5,14" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -737,44 +669,7 @@ export default function Map() {
                 </div>
               </div>
 
-              {/* 3. Path Alignment Heading Gating */}
-              <div className="calib-control-group">
-                <div className="calib-control-header">
-                  <label>Corridor Path Forward Angle:</label>
-                  <span>±{maxPathAngleDeg}° {isPathGatingActive ? '(Active)' : '(Off)'}</span>
-                </div>
-                <input
-                  type="range"
-                  min="25"
-                  max="90"
-                  step="5"
-                  value={maxPathAngleDeg}
-                  onChange={(e) => handlePathGatingChange(isPathGatingActive, Number(e.target.value))}
-                  className="calib-slider"
-                />
-                <div className="calib-presets">
-                  <button
-                    className={`btn-preset ${maxPathAngleDeg === 40 ? 'active' : ''}`}
-                    onClick={() => handlePathGatingChange(true, 40)}
-                  >
-                    Strict (±40°)
-                  </button>
-                  <button
-                    className={`btn-preset ${maxPathAngleDeg === 65 ? 'active' : ''}`}
-                    onClick={() => handlePathGatingChange(true, 65)}
-                  >
-                    Natural (±65°)
-                  </button>
-                  <button
-                    className={`btn-preset ${!isPathGatingActive ? 'active' : ''}`}
-                    onClick={() => handlePathGatingChange(!isPathGatingActive)}
-                  >
-                    {isPathGatingActive ? 'Disable Gating' : 'Enable Gating'}
-                  </button>
-                </div>
-              </div>
-
-              {/* 4. Cadence Lockout Interval */}
+              {/* 3. Cadence Lockout Interval */}
               <div className="calib-control-group">
                 <div className="calib-control-header">
                   <label>Cadence Lockout (Anti-Double-Trigger):</label>
@@ -791,7 +686,7 @@ export default function Map() {
                 />
               </div>
 
-              {/* 5. Compass Alignment Offset */}
+              {/* 4. Compass Alignment Offset */}
               <div className="calib-control-group">
                 <div className="calib-control-header">
                   <label>Building Compass Alignment Offset:</label>

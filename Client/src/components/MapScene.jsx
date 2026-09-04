@@ -104,7 +104,7 @@ function TrackUpCameraController({
     }
   }, [isTrackUpActive]);
 
-  useFrame((_, delta) => {
+  useFrame((state) => {
     if (!controls || !isTrackUpActive || !liveUserPosition) return;
 
     // If user touched the screen while track-up was on, disengage
@@ -116,42 +116,15 @@ function TrackUpCameraController({
 
     const [ux, uz] = liveUserPosition;
 
-    // Direction the user is facing (heading is in radians, 0 = north = -Z in Three.js)
-    const dirX = Math.sin(liveHeading);
-    const dirZ = -Math.cos(liveHeading);
+    controls.target.lerp(new THREE.Vector3(ux, 15, uz), 0.05);
 
-    // Desired camera position: behind the user along their heading
-    const desiredCamX = ux - dirX * trackUpDistance;
-    const desiredCamY = trackUpHeight;
-    const desiredCamZ = uz - dirZ * trackUpDistance;
-
-    // Desired look-at target: ahead of user along their heading
-    const desiredTargetX = ux + dirX * trackUpLookAhead;
-    const desiredTargetY = 15;
-    const desiredTargetZ = uz + dirZ * trackUpLookAhead;
-
-    // First frame: snap instantly
-    if (!hasSnapped.current) {
-      smoothCamPos.current.set(desiredCamX, desiredCamY, desiredCamZ);
-      smoothTarget.current.set(desiredTargetX, desiredTargetY, desiredTargetZ);
-      hasSnapped.current = true;
-    }
-
-    // Smooth interpolation — heavier damping for rock-solid following
-    const followDamp = Math.min(1, 1 - Math.exp(-3.5 * delta));
-
-    smoothCamPos.current.x += (desiredCamX - smoothCamPos.current.x) * followDamp;
-    smoothCamPos.current.y += (desiredCamY - smoothCamPos.current.y) * followDamp;
-    smoothCamPos.current.z += (desiredCamZ - smoothCamPos.current.z) * followDamp;
-
-    smoothTarget.current.x += (desiredTargetX - smoothTarget.current.x) * followDamp;
-    smoothTarget.current.y += (desiredTargetY - smoothTarget.current.y) * followDamp;
-    smoothTarget.current.z += (desiredTargetZ - smoothTarget.current.z) * followDamp;
-
-    // Apply to camera & controls
-    camera.position.copy(smoothCamPos.current);
-    controls.target.copy(smoothTarget.current);
-    camera.lookAt(smoothTarget.current);
+    const rad = liveHeading;
+    const idealCameraPos = new THREE.Vector3(
+      ux - Math.cos(rad) * trackUpDistance,
+      trackUpHeight,
+      uz - Math.sin(rad) * trackUpDistance
+    );
+    state.camera.position.lerp(idealCameraPos, 0.05);
     controls.update();
   });
 

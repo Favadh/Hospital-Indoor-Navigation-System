@@ -1,13 +1,12 @@
 import sensorManager from './sensorManager';
-import MapMatcher from './mapMatcher';
 import { svgToWorld } from '../constants/mapConstants';
 
 /**
- * Robust Pedestrian Dead Reckoning (PDR) Engine
- * - Soft Magnetic Corridor Guiding: Gently centers the arrow along the hallway centerline.
- * - Free exploration when walking off-path.
- * - Bidirectional (forward & backward) movement.
- * - Preserves exact sensitivity, thresholds, and stride calibrations.
+ * Robust Pedestrian Dead Reckoning (PDR) Engine with 100% Path Locking
+ * - Pure 1D Parametric Traversal along the active route polyline.
+ * - Zero Wall / Off-Path Drift: The marker is strictly locked to the calculated path.
+ * - Automatic Initial Path-Heading Alignment (defaults to path direction until first step).
+ * - Directional Step Gating (Forward if diff <= 60°, reverse if diff >= 120°, ignore sideways).
  */
 class PDREngine {
   constructor() {
@@ -16,25 +15,28 @@ class PDREngine {
     this.positionCallbacks = new Set();
     this.debugCallbacks = new Set();
 
-    // Current position in 3D world coordinates
+    // Position & Heading
     this.currentPosition = { x: 0, z: 0 };
-    this.currentHeading = 0; // Heading in radians
     this.rawHeadingDeg = 0;
-    this.compassOffsetDeg = 0;
+    this.compassOffsetDeg = null; // Auto-calibrated on first step
+    this.currentPathAngle = 0;
+
+    // Step state
+    this.steps = 0;
 
     // Configurable Tuning Parameters
-    this.stepPeakThreshold = 0.1; // m/s^2 upward bounce on foot strike
-    this.stepValleyThreshold = -0.40; // m/s^2 downward bounce on unload
-    this.baseStepLength = 22.5; // Map units per step (~0.85m scaled)
-    this.minStepIntervalMs = 300; // Cadence lockout in ms
+    this.stepPeakThreshold = 0.1;
+    this.stepValleyThreshold = -0.40;
+    this.baseStepLength = 22.5;
+    this.minStepIntervalMs = 300;
     this.gravityAlpha = 0.92;
 
-    // Path Guiding & Corridor Centerline Snapping
+    // Active Route Path
     this.activeRoutePath = null;
-    this.corridorSnapRadius = 65; // Distance within which magnetic centerline attraction applies
-    this.centerlineAttraction = 0.20; // 65% magnetic blend to corridor centerline
+    this.routePoints3D = [];
+    this.totalRouteDistance = 0;
 
-    // State tracking
+    // Accelerometer filtering state
     this.lastStepTime = 0;
     this.gx = 0;
     this.gy = 9.8;
@@ -52,11 +54,45 @@ class PDREngine {
 
   setInitialPosition(x, z) {
     this.currentPosition = { x, z };
+    this.steps = 0;
     this.notifyPosition();
   }
 
   setActiveRoutePath(routePath) {
     this.activeRoutePath = routePath;
+    this.steps = 0;
+    this.compassOffsetDeg = null; // Reset for auto-calibration on first step of new route
+
+    if (routePath && routePath.length >= 2) {
+      this.routePoints3D = routePath.map((n) => {
+        const [wx, wz] = svgToWorld(n.x, n.y);
+        return { x: wx, z: wz };
+      });
+
+      let total = 0;
+      for (let i = 0; i < this.routePoints3D.length - 1; i++) {
+        const p1 = this.routePoints3D[i];
+        const p2 = this.routePoints3D[i + 1];
+        total += Math.hypot(p2.x - p1.x, p2.z - p1.z);
+      }
+      this.totalRouteDistance = total;
+
+      // Initialize at start point of route
+      this.currentPosition = { x: this.routePoints3D[0].x, z: this.routePoints3D[0].z };
+
+      // Calculate initial corridor angle: Math.atan2(dz, dx)
+      const dx = this.routePoints3D[1].x - this.routePoints3D[0].x;
+      const dz = this.routePoints3D[1].z - this.routePoints3D[0].z;
+      const angleRad = Math.atan2(dz, dx);
+      let angleDeg = (angleRad * 180) / Math.PI;
+      if (angleDeg < 0) angleDeg += 360;
+      this.currentPathAngle = angleDeg;
+    } else {
+      this.routePoints3D = [];
+      this.totalRouteDistance = 0;
+    }
+
+    this.notifyPosition();
   }
 
   setStepPeakThreshold(val) {
@@ -65,6 +101,7 @@ class PDREngine {
 
   setBaseStepLength(val) {
     this.baseStepLength = Number(val);
+    this.updatePositionFromSteps();
   }
 
   setMinStepIntervalMs(val) {
@@ -73,11 +110,26 @@ class PDREngine {
 
   setCompassOffset(offsetDeg) {
     this.compassOffsetDeg = Number(offsetDeg);
-    this.updateComputedHeading();
+    this.notifyPosition();
+  }
+
+  getDisplayHeadingDeg() {
+    if (this.routePoints3D && this.routePoints3D.length >= 2) {
+      if (this.compassOffsetDeg === null) {
+        return this.currentPathAngle;
+      }
+      return (this.rawHeadingDeg + this.compassOffsetDeg + 360) % 360;
+    }
+    return (this.rawHeadingDeg + (this.compassOffsetDeg || 0) + 360) % 360;
+  }
+
+  getDisplayHeadingRad() {
+    return (this.getDisplayHeadingDeg() * Math.PI) / 180;
   }
 
   start(initialX = 0, initialZ = 0) {
     this.currentPosition = { x: initialX, z: initialZ };
+    this.steps = 0;
     this.isTracking = true;
     this.stepState = 0;
     this.lastStepTime = Date.now();
@@ -100,12 +152,7 @@ class PDREngine {
 
   handleOrientation(headingDegrees) {
     this.rawHeadingDeg = headingDegrees;
-    this.updateComputedHeading();
-  }
-
-  updateComputedHeading() {
-    const alignedHeadingDeg = (this.rawHeadingDeg + this.compassOffsetDeg + 360) % 360;
-    this.currentHeading = (alignedHeadingDeg * Math.PI) / 180;
+    this.notifyPosition();
   }
 
   /**
@@ -190,7 +237,7 @@ class PDREngine {
         this.stepState = 0;
         this.lastStepTime = now;
 
-        this.processStep(this.baseStepLength);
+        this.processStep();
 
         // Haptic feedback
         if (navigator.vibrate) {
@@ -203,38 +250,48 @@ class PDREngine {
   }
 
   /**
-   * Applies step movement with Soft Magnetic Centerline Attraction
+   * Applies step movement with 100% Polyline Path Locking & Compass Gating
    */
-  processStep(stepLength = 22.5) {
-    const prevPos = { ...this.currentPosition };
-
-    // 1. Raw step displacement along user heading
-    let nextX = this.currentPosition.x + stepLength * Math.sin(this.currentHeading);
-    let nextZ = this.currentPosition.z - stepLength * Math.cos(this.currentHeading);
-
-    // 2. Soft corridor centerline magnetic guide (locks lightly to corridor)
-    if (this.activeRoutePath && this.activeRoutePath.length >= 2) {
-      const snapped = MapMatcher.snapToRoute({ x: nextX, z: nextZ }, this.activeRoutePath, this.corridorSnapRadius);
-
-      if (snapped.isSnapped) {
-        // Gently pull towards corridor centerline while retaining natural movement
-        const blend = this.centerlineAttraction;
-        nextX = nextX + blend * (snapped.x - nextX);
-        nextZ = nextZ + blend * (snapped.z - nextZ);
+  processStep() {
+    if (this.routePoints3D && this.routePoints3D.length >= 2) {
+      // 1. Automatic Initial Compass Alignment on first step
+      if (this.compassOffsetDeg === null) {
+        this.compassOffsetDeg = this.currentPathAngle - this.rawHeadingDeg;
       }
+
+      // 2. Compute normalized heading and diff relative to current corridor angle
+      let normalizedHeading = (this.rawHeadingDeg + this.compassOffsetDeg) % 360;
+      if (normalizedHeading < 0) normalizedHeading += 360;
+
+      let diff = Math.abs(normalizedHeading - this.currentPathAngle);
+      if (diff > 180) diff = 360 - diff;
+
+      // 3. Directional Step Gating (Forward / Backward)
+      if (diff <= 85) {
+        this.steps += 1;
+      } else if (diff >= 95) {
+        this.steps = Math.max(0, this.steps - 1);
+      } else {
+        // Sideways deadband (85° - 95°) ignored to prevent false movement
+        return;
+      }
+
+      this.updatePositionFromSteps();
+    } else {
+      // Free exploration fallback if no route is active
+      const headingRad = this.getDisplayHeadingRad();
+      const nextX = this.currentPosition.x + this.baseStepLength * Math.cos(headingRad);
+      const nextZ = this.currentPosition.z + this.baseStepLength * Math.sin(headingRad);
+      this.currentPosition = { x: nextX, z: nextZ };
+      this.steps += 1;
     }
 
-    this.currentPosition.x = nextX;
-    this.currentPosition.z = nextZ;
-
     const stepData = {
-      stepLength,
-      dx: nextX - prevPos.x,
-      dz: nextZ - prevPos.z,
-      heading: this.currentHeading,
-      headingDeg: (this.currentHeading * 180) / Math.PI,
-      from: prevPos,
-      to: { ...this.currentPosition },
+      stepLength: this.baseStepLength,
+      steps: this.steps,
+      heading: this.getDisplayHeadingRad(),
+      headingDeg: this.getDisplayHeadingDeg(),
+      position: { ...this.currentPosition },
       timestamp: Date.now(),
     };
 
@@ -242,9 +299,70 @@ class PDREngine {
     this.notifyPosition();
   }
 
-  simulateStep(directionAngleDeg = null, stepDistance = null) {
-    const d = stepDistance !== null ? Number(stepDistance) : this.baseStepLength;
-    this.processStep(d);
+  /**
+   * Calculates the exact parametric position along the polyline route
+   */
+  updatePositionFromSteps() {
+    if (!this.routePoints3D || this.routePoints3D.length < 2) return;
+
+    let distanceToTravel = this.steps * this.baseStepLength;
+    const points = this.routePoints3D;
+
+    let newPos = { x: points[0].x, z: points[0].z };
+    let currentDir = { x: 1, z: 0 };
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const p1 = points[i];
+      const p2 = points[i + 1];
+
+      const dx = p2.x - p1.x;
+      const dz = p2.z - p1.z;
+      const segmentLogicalDist = Math.hypot(dx, dz);
+
+      if (segmentLogicalDist > 0) {
+        currentDir = { x: dx / segmentLogicalDist, z: dz / segmentLogicalDist };
+      }
+
+      if (distanceToTravel > segmentLogicalDist && segmentLogicalDist > 0) {
+        distanceToTravel -= segmentLogicalDist;
+        newPos = { x: p2.x, z: p2.z };
+      } else if (segmentLogicalDist > 0) {
+        const fraction = Math.max(0, Math.min(1, distanceToTravel / segmentLogicalDist));
+        newPos = {
+          x: p1.x + fraction * dx,
+          z: p1.z + fraction * dz,
+        };
+        distanceToTravel = 0;
+        break;
+      }
+    }
+
+    this.currentPosition = newPos;
+
+    // Update current corridor angle: Math.atan2(dz, dx)
+    if (currentDir.x !== 0 || currentDir.z !== 0) {
+      const angleRad = Math.atan2(currentDir.z, currentDir.x);
+      let angleDeg = (angleRad * 180) / Math.PI;
+      if (angleDeg < 0) angleDeg += 360;
+      this.currentPathAngle = angleDeg;
+    }
+  }
+
+  simulateStep() {
+    this.steps += 1;
+    this.updatePositionFromSteps();
+
+    const stepData = {
+      stepLength: this.baseStepLength,
+      steps: this.steps,
+      heading: this.getDisplayHeadingRad(),
+      headingDeg: this.getDisplayHeadingDeg(),
+      position: { ...this.currentPosition },
+      timestamp: Date.now(),
+    };
+
+    this.stepCallbacks.forEach((cb) => cb(stepData));
+    this.notifyPosition();
   }
 
   onStep(callback) {
@@ -263,8 +381,16 @@ class PDREngine {
   }
 
   notifyPosition() {
+    const dispHeading = this.getDisplayHeadingRad();
+    const dispHeadingDeg = this.getDisplayHeadingDeg();
     this.positionCallbacks.forEach((cb) =>
-      cb({ ...this.currentPosition, heading: this.currentHeading })
+      cb({
+        x: this.currentPosition.x,
+        z: this.currentPosition.z,
+        heading: dispHeading,
+        headingDeg: dispHeadingDeg,
+        pathAngle: this.currentPathAngle,
+      })
     );
   }
 }

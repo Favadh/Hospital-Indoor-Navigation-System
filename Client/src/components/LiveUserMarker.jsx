@@ -3,15 +3,15 @@ import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 
 /**
- * 3D Green Navigation Arrow Marker with Continuous Fluid Walking Animation
- * - Smooth Stride Gliding: Eliminates discrete step jumping with continuous cubic ease-out stride interpolation.
- * - Organic Walking Bob: Adds a subtle natural vertical cadence during movement.
- * - Continuous Heading Rotation: Smooth shortest-arc yaw rotation.
+ * 3D Navigation Arrow Marker with White Halo Base (Friend's Exact Chevron & Base Geometry)
+ * - 100% Locked & Aligned with path progression.
+ * - Smooth Stride Gliding: Continuous cubic ease-out stride interpolation.
+ * - True 3D Chevron Arrow with White Halo base disk.
  */
 export default function LiveUserMarker({ position, heading = 0, isActive = true }) {
   const groupRef = useRef();
   const arrowRef = useRef();
-  const ringRef = useRef();
+  const haloRef = useRef();
 
   // Animation interpolation state
   const animRef = useRef({
@@ -21,8 +21,6 @@ export default function LiveUserMarker({ position, heading = 0, isActive = true 
     startTime: performance.now(),
     duration: 420, // ms duration of stride glide
     isAnimating: false,
-    lastInputX: position[0],
-    lastInputZ: position[1],
   });
 
   // Track position prop updates and trigger continuous stride glide
@@ -36,7 +34,7 @@ export default function LiveUserMarker({ position, heading = 0, isActive = true 
     if (dist < 0.1) return;
 
     if (dist > 180) {
-      // Teleport / initial load / re-routing jump: snap immediately
+      // Teleport / initial load jump: snap immediately
       a.currentPos.set(targetX, 18, targetZ);
       a.startPos.set(targetX, 18, targetZ);
       a.targetPos.set(targetX, 18, targetZ);
@@ -49,37 +47,30 @@ export default function LiveUserMarker({ position, heading = 0, isActive = true 
       a.startPos.copy(a.currentPos);
       a.targetPos.set(targetX, 18, targetZ);
       a.startTime = performance.now();
-      a.duration = Math.max(380, Math.min(520, dist * 18));
+      a.duration = Math.max(350, Math.min(500, dist * 18));
       a.isAnimating = true;
     }
-
-    a.lastInputX = targetX;
-    a.lastInputZ = targetZ;
   }, [position]);
 
-  // Create an extruded 3D Chevron Arrow Shape (Pointing Forward towards -Z)
+  // Create friend's 3D Chevron Shape (Tip at +X)
   const arrowGeometry = useMemo(() => {
     const shape = new THREE.Shape();
-    shape.moveTo(0, 26); // Arrow tip
-    shape.lineTo(16, -14);
-    shape.lineTo(6, -8);
-    shape.lineTo(6, -20);
-    shape.lineTo(-6, -20);
-    shape.lineTo(-6, -8);
-    shape.lineTo(-16, -14);
-    shape.closePath();
+    shape.moveTo(25, 0); // Tip
+    shape.lineTo(-15, -18); // Right back
+    shape.lineTo(-5, 0); // Inner notch
+    shape.lineTo(-15, 18); // Left back
+    shape.lineTo(25, 0);
 
     const extrudeSettings = {
-      depth: 5,
+      depth: 4,
       bevelEnabled: true,
       bevelSegments: 2,
       steps: 1,
-      bevelSize: 1.2,
-      bevelThickness: 1.2,
+      bevelSize: 1.5,
+      bevelThickness: 1.5,
     };
 
     const geom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-    geom.center();
     return geom;
   }, []);
 
@@ -94,7 +85,7 @@ export default function LiveUserMarker({ position, heading = 0, isActive = true 
       const elapsed = now - a.startTime;
       const progress = Math.min(1.0, Math.max(0.0, elapsed / a.duration));
 
-      // Cubic Ease-Out: 1 - (1 - t)^3 (starts briskly, glides smoothly to a soft landing)
+      // Cubic Ease-Out
       const easeOut = 1 - Math.pow(1 - progress, 3);
 
       a.currentPos.x = a.startPos.x + (a.targetPos.x - a.startPos.x) * easeOut;
@@ -109,30 +100,28 @@ export default function LiveUserMarker({ position, heading = 0, isActive = true 
         a.currentPos.copy(a.targetPos);
       }
     } else {
-      // Asymptotic settle when stationary
       a.currentPos.lerp(a.targetPos, Math.min(1, delta * 8));
       a.currentPos.y = 18;
     }
 
     groupRef.current.position.copy(a.currentPos);
 
-    // 2. Continuous Shortest-Arc Heading Rotation
+    // 2. Shortest-Arc Heading Rotation
     if (arrowRef.current) {
       const currentRot = arrowRef.current.rotation.y;
       const targetRot = -heading;
       let diff = ((targetRot - currentRot + Math.PI) % (2 * Math.PI)) - Math.PI;
       if (diff < -Math.PI) diff += 2 * Math.PI;
 
-      // Smooth damped turn interpolation (exponential decay)
       const rotDamp = Math.min(1, 1 - Math.exp(-12 * delta));
       arrowRef.current.rotation.y = currentRot + diff * rotDamp;
     }
 
-    // 3. Pulse animation for floor ring
-    if (ringRef.current) {
+    // 3. Subtle breathing scale for white halo
+    if (haloRef.current) {
       const time = state.clock.getElapsedTime();
-      const scale = 1 + 0.16 * Math.sin(time * 3);
-      ringRef.current.scale.set(scale, scale, 1);
+      const scale = 1 + 0.06 * Math.sin(time * 2.5);
+      haloRef.current.scale.set(scale, scale, 1);
     }
   });
 
@@ -140,21 +129,21 @@ export default function LiveUserMarker({ position, heading = 0, isActive = true 
 
   return (
     <group ref={groupRef} position={[position[0], 18, position[1]]}>
-      {/* 1. Floor Pulsing Emerald Glow Ring */}
-      <mesh ref={ringRef} position={[0, 2, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[14, 22, 32]} />
-        <meshBasicMaterial color="#00ff88" transparent opacity={0.4} side={THREE.DoubleSide} />
+      {/* 1. White Halo Base Disk */}
+      <mesh ref={haloRef} position={[0, 1, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={998}>
+        <circleGeometry args={[32, 32]} />
+        <meshBasicMaterial color="#ffffff" transparent opacity={0.85} depthTest={false} depthWrite={false} />
       </mesh>
 
-      {/* 2. Forward-Facing Green 3D Navigation Arrow (Glides smoothly) */}
-      <group ref={arrowRef} position={[0, 10, 0]}>
-        <mesh geometry={arrowGeometry} rotation={[-Math.PI / 2, 0, 0]}>
+      {/* 2. 3D Chevron Arrow */}
+      <group ref={arrowRef} rotation={[0, -heading, 0]}>
+        <mesh geometry={arrowGeometry} rotation={[-Math.PI / 2, 0, 0]} position={[0, 4, 0]} renderOrder={1000} castShadow>
           <meshStandardMaterial
             color="#00ff88"
-            emissive="#006633"
+            emissive="#004422"
             emissiveIntensity={0.4}
-            roughness={0.85}
-            metalness={0.0}
+            roughness={0.4}
+            metalness={0.1}
           />
         </mesh>
       </group>
