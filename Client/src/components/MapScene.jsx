@@ -14,6 +14,7 @@ import { svgToWorld } from '../constants/mapConstants';
  */
 function NavigationCameraController({
   routeData,
+  isTrackingActive,
   behindDistance = 900,
   camHeight = 1100,
   lookAheadDist = 120,
@@ -22,7 +23,7 @@ function NavigationCameraController({
   const controls = useThree((state) => state.controls);
 
   useEffect(() => {
-    if (!routeData?.path || routeData.path.length < 2 || !controls) return;
+    if (!isTrackingActive || !routeData?.path || routeData.path.length < 2 || !controls) return;
 
     const path = routeData.path;
     const startNode = path[0];
@@ -52,7 +53,7 @@ function NavigationCameraController({
     camera.position.set(camX, camY, camZ);
     camera.lookAt(targetX, targetY, targetZ);
     controls.update();
-  }, [routeData, behindDistance, camHeight, lookAheadDist, camera, controls]);
+  }, [isTrackingActive, routeData, behindDistance, camHeight, lookAheadDist, camera, controls]);
 
   return null;
 }
@@ -398,7 +399,7 @@ export default function MapScene({
           )}
 
           {/* Live User Movement Marker */}
-          {isTrackingActive && liveUserPosition && (
+          {liveUserPosition && (
             <LiveUserMarker
               position={liveUserPosition}
               heading={liveHeading}
@@ -428,6 +429,7 @@ export default function MapScene({
         {/* Automatic Initial Camera Orientation on Route Calculation with configurable Zoom */}
         <NavigationCameraController
           routeData={routeData}
+          isTrackingActive={isTrackingActive}
           behindDistance={camBehindDistance}
           camHeight={camHeight}
         />

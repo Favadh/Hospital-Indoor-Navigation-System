@@ -143,6 +143,16 @@ class PDREngine {
     this.notifyPosition();
   }
 
+  setTracking(active) {
+    this.isTracking = Boolean(active);
+    if (active) {
+      this.steps = 0;
+      this.stepState = 0;
+      this.lastStepTime = Date.now();
+      this.compassOffsetDeg = null;
+    }
+  }
+
   stop() {
     this.isTracking = false;
     if (this.unsubMotion) this.unsubMotion();
