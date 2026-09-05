@@ -1,7 +1,7 @@
 // --- Map & SVG Constants ---
 export const SVG_W = 1920;
 export const SVG_H = 1080;
-export const WALL_HEIGHT = 80;
+export const WALL_HEIGHT = 50;
 export const WALL_THICKNESS = 8;
 export const OFFSET_X = -SVG_W / 2; // -960
 export const OFFSET_Z = -SVG_H / 2; // -540

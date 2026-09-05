@@ -48,9 +48,9 @@ export default function Map() {
   const [headingDegrees, setHeadingDegrees] = useState(0);
   const [stepCount, setStepCount] = useState(0);
 
-  // Camera Settings
+  // Camera Settings (Matching Friend's Exact 35° Isometric FOV & Pitch)
   const [camBehindDistance, setCamBehindDistance] = useState(550);
-  const [camHeight, setCamHeight] = useState(600);
+  const [camHeight, setCamHeight] = useState(450);
 
   // Track-Up Camera Follow Mode
   const [isTrackUpActive, setIsTrackUpActive] = useState(false);
@@ -198,7 +198,6 @@ export default function Map() {
           setLiveUserPos([startX, startZ]);
 
           pdrEngine.start(startX, startZ);
-          pdrEngine.setTracking(false);
           sensorManager.start().catch(() => {});
         }
       } catch {
@@ -232,34 +231,39 @@ export default function Map() {
     setNavError(null);
   };
 
-  // Called ONLY when user clicks "Start" button in Route Planner Card
+  // Called when user clicks "Start" button in Route Planner Card
   const handleFindRoute = () => {
     if (!startName || !destName) return;
     if (!routeData) {
       computeRoute(startName, destName);
     }
-    pdrEngine.setActiveRoutePath(routeData?.path || null);
+    setStepCount(0);
     pdrEngine.setTracking(true);
+    pdrEngine.steps = 0;
     setIsTrackingActive(true);
     setIsTrackUpActive(true);
     setSearchParams({ start: startName, destination: destName });
   };
 
   const handleExitNavigation = () => {
-    pdrEngine.setTracking(false);
     setIsTrackingActive(false);
     setIsTrackUpActive(false);
+    setStepCount(0);
+    pdrEngine.setTracking(false);
+    pdrEngine.steps = 0;
   };
 
   const handleClearRoute = () => {
-    pdrEngine.setTracking(false);
     setIsTrackingActive(false);
     setIsTrackUpActive(false);
+    setStepCount(0);
     setDestName('');
     setRouteData(null);
     setNavError(null);
     setShowArrivalModal(false);
     pdrEngine.setActiveRoutePath(null);
+    pdrEngine.setTracking(false);
+    pdrEngine.steps = 0;
     setSearchParams(startName ? { start: startName } : {});
   };
 
@@ -323,8 +327,18 @@ export default function Map() {
     }
   };
 
-  // Calculate remaining steps
-  const totalDistance = pdrEngine.totalRouteDistance || 0;
+  // Calculate remaining steps directly from routeData for 100% immediate accuracy
+  const totalDistance = React.useMemo(() => {
+    if (!routeData?.path || routeData.path.length < 2) return 0;
+    let total = 0;
+    for (let i = 0; i < routeData.path.length - 1; i++) {
+      const p1 = svgToWorld(routeData.path[i].x, routeData.path[i].y);
+      const p2 = svgToWorld(routeData.path[i + 1].x, routeData.path[i + 1].y);
+      total += Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
+    }
+    return total;
+  }, [routeData]);
+
   const totalEstimatedSteps = Math.ceil(totalDistance / pdrEngine.baseStepLength) || 0;
   const stepsRemaining = Math.max(0, totalEstimatedSteps - stepCount);
 
@@ -386,9 +400,16 @@ export default function Map() {
         {/* Recenter / Compass FAB */}
         <button
           className={`gmaps-fab gmaps-fab-recenter ${isTrackUpActive ? 'active' : ''}`}
-          onClick={() => setIsTrackUpActive((prev) => !prev)}
+          onPointerDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsTrackUpActive(true);
+          }}
           title={isTrackUpActive ? 'Following route (Click to free pan)' : 'Re-center on user marker'}
           aria-label="Re-center camera"
+          type="button"
         >
           <svg
             viewBox="0 0 24 24"
@@ -424,7 +445,9 @@ export default function Map() {
               </div>
               <div className="gmaps-steps-number">{stepsRemaining}</div>
               <div className="gmaps-steps-label">steps remaining (~{Math.round(stepsRemaining * 0.75)} m)</div>
-              <div className="gmaps-dest-subtext">to {destName}</div>
+              <div className="gmaps-dest-subtext">
+                to <span className="gmaps-dest-highlight">{destName}</span>
+              </div>
             </>
           ) : (
             <>

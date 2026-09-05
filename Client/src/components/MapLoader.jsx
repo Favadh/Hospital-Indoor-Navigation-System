@@ -13,6 +13,19 @@ export default function MapLoader({
   subtitle = 'Calibrating hospital nodes & pathways...',
   isOverlay = true,
 }) {
+  React.useEffect(() => {
+    if (!isOverlay) return;
+    const originalOverflow = document.body.style.overflow;
+    const originalTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = 'hidden';
+    document.body.style.touchAction = 'none';
+
+    return () => {
+      document.body.style.overflow = originalOverflow;
+      document.body.style.touchAction = originalTouchAction;
+    };
+  }, [isOverlay]);
+
   const content = (
     <div className="map-loader-card">
       <div className="map-radar-spinner">

@@ -2,11 +2,34 @@ import sensorManager from './sensorManager';
 import { svgToWorld } from '../constants/mapConstants';
 
 /**
- * Robust Pedestrian Dead Reckoning (PDR) Engine with 100% Path Locking
- * - Pure 1D Parametric Traversal along the active route polyline.
- * - Zero Wall / Off-Path Drift: The marker is strictly locked to the calculated path.
- * - Automatic Initial Path-Heading Alignment (defaults to path direction until first step).
- * - Directional Step Gating (Forward if diff <= 60°, reverse if diff >= 120°, ignore sideways).
+ * 2D Geometry helpers for Wall Collision & Doorway Navigation
+ */
+function ccw(A, B, C) {
+  return (C.z - A.z) * (B.x - A.x) > (B.z - A.z) * (C.x - A.x);
+}
+
+function lineSegmentsIntersect(p1, p2, p3, p4) {
+  return (
+    ccw(p1, p3, p4) !== ccw(p2, p3, p4) &&
+    ccw(p1, p2, p3) !== ccw(p1, p2, p4)
+  );
+}
+
+function distToSegmentSq(p, v, w) {
+  const l2 = (w.x - v.x) ** 2 + (w.z - v.z) ** 2;
+  if (l2 === 0) return (p.x - v.x) ** 2 + (p.z - v.z) ** 2;
+  let t = ((p.x - v.x) * (w.x - v.x) + (p.z - v.z) * (w.z - v.z)) / l2;
+  t = Math.max(0, Math.min(1, t));
+  const projX = v.x + t * (w.x - v.x);
+  const projZ = v.z + t * (w.z - v.z);
+  return (p.x - projX) ** 2 + (p.z - projZ) ** 2;
+}
+
+/**
+ * Robust Pedestrian Dead Reckoning (PDR) Engine with:
+ * - 100% Polyline Path Locking during active navigation.
+ * - Free Dead-Reckoning with 2D Wall Collision & Doorway Passing when exploring.
+ * - Solid Wall Blocking & Sliding (stops at solid walls, passes freely through open doors).
  */
 class PDREngine {
   constructor() {
@@ -36,6 +59,10 @@ class PDREngine {
     this.routePoints3D = [];
     this.totalRouteDistance = 0;
 
+    // Wall Segments for Collision Detection
+    this.wallSegments = [];
+    this.loadWallSegments();
+
     // Accelerometer filtering state
     this.lastStepTime = 0;
     this.gx = 0;
@@ -52,16 +79,67 @@ class PDREngine {
     this.handleOrientation = this.handleOrientation.bind(this);
   }
 
-  setInitialPosition(x, z) {
-    this.currentPosition = { x, z };
-    this.steps = 0;
-    this.notifyPosition();
+  loadWallSegments() {
+    if (typeof window !== 'undefined' && typeof fetch === 'function') {
+      fetch('/Hospital G.svg')
+        .then((res) => res.text())
+        .then((svgText) => {
+          this.parseWallSegments(svgText);
+        })
+        .catch((err) => {
+          console.warn('Failed to load wall segments for collision detection:', err);
+        });
+    }
+  }
+
+  parseWallSegments(svgText) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(svgText, 'image/svg+xml');
+      const lines = doc.querySelectorAll('line');
+      const segs = [];
+      lines.forEach((el) => {
+        const stroke = el.getAttribute('stroke');
+        if (stroke !== 'black') return;
+        const x1 = parseFloat(el.getAttribute('x1')) - 960;
+        const y1 = parseFloat(el.getAttribute('y1')) - 540;
+        const x2 = parseFloat(el.getAttribute('x2')) - 960;
+        const y2 = parseFloat(el.getAttribute('y2')) - 540;
+        if (Math.hypot(x2 - x1, y2 - y1) < 1) return;
+        segs.push({ p1: { x: x1, z: y1 }, p2: { x: x2, z: y2 } });
+      });
+      this.wallSegments = segs;
+    } catch (e) {
+      console.warn('Error parsing wall segments:', e);
+    }
+  }
+
+  isMovementValid(from, to) {
+    // 1. Outer hospital floor boundary limits
+    if (to.x < -930 || to.x > 930 || to.z < -510 || to.z > 510) {
+      return false;
+    }
+
+    if (!this.wallSegments || this.wallSegments.length === 0) {
+      return true;
+    }
+
+    const wallRadiusSq = 7 * 7; // Wall thickness buffer
+    for (let i = 0; i < this.wallSegments.length; i++) {
+      const seg = this.wallSegments[i];
+      if (lineSegmentsIntersect(from, to, seg.p1, seg.p2)) {
+        return false;
+      }
+      if (distToSegmentSq(to, seg.p1, seg.p2) < wallRadiusSq) {
+        return false;
+      }
+    }
+    return true;
   }
 
   setActiveRoutePath(routePath) {
     this.activeRoutePath = routePath;
     this.steps = 0;
-    this.compassOffsetDeg = null; // Reset for auto-calibration on first step of new route
 
     if (routePath && routePath.length >= 2) {
       this.routePoints3D = routePath.map((n) => {
@@ -87,9 +165,17 @@ class PDREngine {
       let angleDeg = (angleRad * 180) / Math.PI;
       if (angleDeg < 0) angleDeg += 360;
       this.currentPathAngle = angleDeg;
+
+      // Auto-calibrate compass offset immediately so compass rotation works right at the start point
+      if (this.rawHeadingDeg !== undefined && this.rawHeadingDeg !== null) {
+        this.compassOffsetDeg = this.currentPathAngle - this.rawHeadingDeg;
+      } else {
+        this.compassOffsetDeg = null;
+      }
     } else {
       this.routePoints3D = [];
       this.totalRouteDistance = 0;
+      this.compassOffsetDeg = null;
     }
 
     this.notifyPosition();
@@ -114,13 +200,13 @@ class PDREngine {
   }
 
   getDisplayHeadingDeg() {
-    if (this.routePoints3D && this.routePoints3D.length >= 2) {
-      if (this.compassOffsetDeg === null) {
-        return this.currentPathAngle;
-      }
+    if (this.compassOffsetDeg !== null) {
       return (this.rawHeadingDeg + this.compassOffsetDeg + 360) % 360;
     }
-    return (this.rawHeadingDeg + (this.compassOffsetDeg || 0) + 360) % 360;
+    if (this.rawHeadingDeg !== undefined && this.rawHeadingDeg !== null) {
+      return (this.rawHeadingDeg + 360) % 360;
+    }
+    return this.currentPathAngle || 0;
   }
 
   getDisplayHeadingRad() {
@@ -149,7 +235,9 @@ class PDREngine {
       this.steps = 0;
       this.stepState = 0;
       this.lastStepTime = Date.now();
-      this.compassOffsetDeg = null;
+      if (this.currentPathAngle !== undefined && this.rawHeadingDeg !== undefined) {
+        this.compassOffsetDeg = this.currentPathAngle - this.rawHeadingDeg;
+      }
     }
   }
 
@@ -162,6 +250,9 @@ class PDREngine {
 
   handleOrientation(headingDegrees) {
     this.rawHeadingDeg = headingDegrees;
+    if (this.compassOffsetDeg === null && this.currentPathAngle !== undefined) {
+      this.compassOffsetDeg = this.currentPathAngle - this.rawHeadingDeg;
+    }
     this.notifyPosition();
   }
 
@@ -259,8 +350,19 @@ class PDREngine {
     }
   }
 
+  setInitialPosition(x, z) {
+    // Clamp to map boundary bounds [-960, 960] and [-540, 540]
+    const clampedX = Math.max(-950, Math.min(950, x));
+    const clampedZ = Math.max(-530, Math.min(530, z));
+    this.currentPosition = { x: clampedX, z: clampedZ };
+    this.steps = 0;
+    this.notifyPosition();
+  }
+
   /**
-   * Applies step movement with 100% Polyline Path Locking & Compass Gating
+   * Applies step movement:
+   * - 100% Polyline Path Locking & Compass Gating when an active route is present.
+   * - Free Dead-Reckoning with 2D Wall Collision & Doorway Passage when exploring freely without a route.
    */
   processStep() {
     if (this.routePoints3D && this.routePoints3D.length >= 2) {
@@ -276,9 +378,11 @@ class PDREngine {
       let diff = Math.abs(normalizedHeading - this.currentPathAngle);
       if (diff > 180) diff = 360 - diff;
 
-      // 3. Directional Step Gating (Forward / Backward)
+      // 3. Directional Step Gating (Forward / Backward) with destination clamping
+      const maxSteps = Math.ceil(this.totalRouteDistance / this.baseStepLength);
+
       if (diff <= 85) {
-        this.steps += 1;
+        this.steps = Math.min(maxSteps, this.steps + 1);
       } else if (diff >= 95) {
         this.steps = Math.max(0, this.steps - 1);
       } else {
@@ -288,12 +392,29 @@ class PDREngine {
 
       this.updatePositionFromSteps();
     } else {
-      // Free exploration fallback if no route is active
-      const headingRad = this.getDisplayHeadingRad();
-      const nextX = this.currentPosition.x + this.baseStepLength * Math.cos(headingRad);
-      const nextZ = this.currentPosition.z + this.baseStepLength * Math.sin(headingRad);
-      this.currentPosition = { x: nextX, z: nextZ };
-      this.steps += 1;
+      // Free Dead-Reckoning Mode with 2D Wall Collision Detection & Doorway Passing
+      const rad = this.getDisplayHeadingRad();
+      const dx = Math.cos(rad) * this.baseStepLength;
+      const dz = Math.sin(rad) * this.baseStepLength;
+      const cur = this.currentPosition;
+      const target = { x: cur.x + dx, z: cur.z + dz };
+
+      if (this.isMovementValid(cur, target)) {
+        this.currentPosition = target;
+        this.steps += 1;
+      } else {
+        // Wall sliding response along X or Z axis if valid
+        const slideX = { x: cur.x + dx, z: cur.z };
+        const slideZ = { x: cur.x, z: cur.z + dz };
+        if (this.isMovementValid(cur, slideX)) {
+          this.currentPosition = slideX;
+          this.steps += 1;
+        } else if (this.isMovementValid(cur, slideZ)) {
+          this.currentPosition = slideZ;
+          this.steps += 1;
+        }
+        // Blocked by solid wall: marker stays safe without crossing the wall
+      }
     }
 
     const stepData = {
@@ -315,8 +436,9 @@ class PDREngine {
   updatePositionFromSteps() {
     if (!this.routePoints3D || this.routePoints3D.length < 2) return;
 
-    let distanceToTravel = this.steps * this.baseStepLength;
     const points = this.routePoints3D;
+    const maxDist = this.totalRouteDistance;
+    let distanceToTravel = Math.max(0, Math.min(maxDist, this.steps * this.baseStepLength));
 
     let newPos = { x: points[0].x, z: points[0].z };
     let currentDir = { x: 1, z: 0 };
@@ -347,7 +469,11 @@ class PDREngine {
       }
     }
 
-    this.currentPosition = newPos;
+    // Strict containment guarantee
+    this.currentPosition = {
+      x: Math.max(-950, Math.min(950, newPos.x)),
+      z: Math.max(-530, Math.min(530, newPos.z)),
+    };
 
     // Update current corridor angle: Math.atan2(dz, dx)
     if (currentDir.x !== 0 || currentDir.z !== 0) {
@@ -359,8 +485,33 @@ class PDREngine {
   }
 
   simulateStep() {
-    this.steps += 1;
-    this.updatePositionFromSteps();
+    if (this.routePoints3D && this.routePoints3D.length >= 2) {
+      const maxSteps = Math.ceil(this.totalRouteDistance / this.baseStepLength);
+      this.steps = Math.min(maxSteps, this.steps + 1);
+      this.updatePositionFromSteps();
+    } else {
+      // Free Dead-Reckoning simulation step with Wall Collision
+      const rad = this.getDisplayHeadingRad();
+      const dx = Math.cos(rad) * this.baseStepLength;
+      const dz = Math.sin(rad) * this.baseStepLength;
+      const cur = this.currentPosition;
+      const target = { x: cur.x + dx, z: cur.z + dz };
+
+      if (this.isMovementValid(cur, target)) {
+        this.currentPosition = target;
+        this.steps += 1;
+      } else {
+        const slideX = { x: cur.x + dx, z: cur.z };
+        const slideZ = { x: cur.x, z: cur.z + dz };
+        if (this.isMovementValid(cur, slideX)) {
+          this.currentPosition = slideX;
+          this.steps += 1;
+        } else if (this.isMovementValid(cur, slideZ)) {
+          this.currentPosition = slideZ;
+          this.steps += 1;
+        }
+      }
+    }
 
     const stepData = {
       stepLength: this.baseStepLength,

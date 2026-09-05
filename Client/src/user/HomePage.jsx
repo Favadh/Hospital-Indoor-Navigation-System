@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import {
+  Sparkles,
+  Compass,
+  MapPin,
+  ArrowRight,
+  Siren,
+  Building2,
+  Smartphone,
+  Accessibility,
+  ShieldCheck,
+  Layers,
+} from 'lucide-react';
 import Header from '../components/Header';
 import QRScannerModal from '../components/QRScannerModal';
 import api from '../utils/axiosInstance';
@@ -43,7 +55,7 @@ export default function HomePage() {
       {/* ===================================================================== */}
       <section className="hero-section">
         <div className="hero-badge">
-          <span>✨</span> Smart 2.5D Indoor Wayfinding System
+          <Sparkles size={14} color="#00ff88" style={{ marginRight: '6px' }} /> Smart 2.5D Indoor Wayfinding System
         </div>
 
         <h1 className="hero-title">
@@ -113,8 +125,8 @@ export default function HomePage() {
         <div className="shortcuts-container">
           <div className="shortcuts-top-bar">
             <div>
-              <h2 className="section-title" style={{ fontSize: '1.6rem', textAlign: 'left' }}>
-                🚀 Quick Department Finder
+              <h2 className="section-title" style={{ fontSize: '1.6rem', textAlign: 'left', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Compass size={24} color="#00ff88" /> Quick Department Finder
               </h2>
               <p className="section-subtitle" style={{ textAlign: 'left' }}>
                 Jump straight into navigation for frequently visited areas
@@ -132,7 +144,9 @@ export default function HomePage() {
                 className="dept-card"
                 onClick={() => navigate(`/map?destination=${encodeURIComponent(dept)}`)}
               >
-                <span>📍 {dept}</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <MapPin size={15} color="#ff4d4f" /> {dept}
+                </span>
                 <span className="dept-arrow">➔</span>
               </button>
             ))}
@@ -153,7 +167,9 @@ export default function HomePage() {
 
         <div className="features-grid">
           <div className="feature-card">
-            <div className="feature-icon">📐</div>
+            <div className="feature-icon">
+              <Compass size={24} color="#00ff88" />
+            </div>
             <h3 className="feature-title">Dijkstra Algorithm Precision</h3>
             <p className="feature-desc">
               Calculates mathematically optimal, obstacle-free paths across corridor junctions and hall intersections in milliseconds.
@@ -161,7 +177,9 @@ export default function HomePage() {
           </div>
 
           <div className="feature-card">
-            <div className="feature-icon">🚨</div>
+            <div className="feature-icon">
+              <Siren size={24} color="#ff4757" />
+            </div>
             <h3 className="feature-title">Instant Emergency Routing</h3>
             <p className="feature-desc">
               Quick one-tap routing for rapid emergency response to Casualty, Trauma units, ICU, and Blood Banks.
@@ -169,7 +187,9 @@ export default function HomePage() {
           </div>
 
           <div className="feature-card">
-            <div className="feature-icon">🏢</div>
+            <div className="feature-icon">
+              <Building2 size={24} color="#4285F4" />
+            </div>
             <h3 className="feature-title">True 2.5D Architectural Model</h3>
             <p className="feature-desc">
               Extruded walls and spatial depth rendered via WebGL and Three.js offer intuitive visual orientation compared to flat blueprints.
@@ -177,7 +197,9 @@ export default function HomePage() {
           </div>
 
           <div className="feature-card">
-            <div className="feature-icon">📱</div>
+            <div className="feature-icon">
+              <Smartphone size={24} color="#00ff88" />
+            </div>
             <h3 className="feature-title">Zero Installation Required</h3>
             <p className="feature-desc">
               Runs seamlessly in standard mobile browsers. Patients don't need to download bulky native apps or share location permissions.
@@ -185,7 +207,9 @@ export default function HomePage() {
           </div>
 
           <div className="feature-card">
-            <div className="feature-icon">♿</div>
+            <div className="feature-icon">
+              <Accessibility size={24} color="#00d2d3" />
+            </div>
             <h3 className="feature-title">Accessible & Step-Free</h3>
             <p className="feature-desc">
               Includes designated lift junctions, wide corridors, and wheelchair-accessible paths across the medical facility.
@@ -193,7 +217,9 @@ export default function HomePage() {
           </div>
 
           <div className="feature-card">
-            <div className="feature-icon">🔒</div>
+            <div className="feature-icon">
+              <ShieldCheck size={24} color="#00ff88" />
+            </div>
             <h3 className="feature-title">100% Private & On-Premise</h3>
             <p className="feature-desc">
               No GPS tracking, personal data collection, or patient history logs. Navigation computations happen securely and privately.

@@ -122,7 +122,7 @@
 }
 
 .gmaps-select-destination {
-  color: #38bdf8;
+  color: #f8fafc;
   font-weight: 600;
 }
 
@@ -132,12 +132,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
+  width: 100%;
 }
 
 .gmaps-distance-display {
   flex: 1;
-  min-width: 180px;
+  min-width: 0;
 }
 
 .gmaps-distance-active {
@@ -161,6 +161,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
+  justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .gmaps-btn-outline {

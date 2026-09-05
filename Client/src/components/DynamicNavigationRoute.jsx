@@ -48,42 +48,46 @@ export default function DynamicNavigationRoute({
   const [startWx, startWz] = svgToWorld(startNode.x, startNode.y);
   const [destWx, destWz] = svgToWorld(destNode.x, destNode.y);
 
-  // Smooth interpolated position for 60fps continuous line regression
-  const smoothPosRef = useRef(
-    liveUserPosition ? [liveUserPosition[0], liveUserPosition[1]] : [startWx, startWz]
-  );
+  const lastProjRef = useRef(null);
+  const lastIndexRef = useRef(-1);
 
   const [points, setPoints] = useState({
     completed: [],
     remaining: fullPoints3D,
   });
 
+  const smoothPosRef = useRef({
+    x: liveUserPosition ? liveUserPosition[0] : 0,
+    z: liveUserPosition ? liveUserPosition[1] : 0,
+  });
+
   // Snap position on route change or teleport
   useEffect(() => {
+    lastProjRef.current = null;
+    lastIndexRef.current = -1;
     if (liveUserPosition) {
-      const dist = Math.hypot(
-        liveUserPosition[0] - smoothPosRef.current[0],
-        liveUserPosition[1] - smoothPosRef.current[1]
-      );
-      if (dist > 180) {
-        smoothPosRef.current = [liveUserPosition[0], liveUserPosition[1]];
-      }
+      smoothPosRef.current.x = liveUserPosition[0];
+      smoothPosRef.current.z = liveUserPosition[1];
     }
   }, [liveUserPosition, routePath]);
 
   useFrame((_, delta) => {
-    if (!isTrackingActive || !liveUserPosition) return;
+    if (!liveUserPosition) return;
 
-    const targetX = liveUserPosition[0];
-    const targetZ = liveUserPosition[1];
+    const smooth = smoothPosRef.current;
+    const distToTarget = Math.hypot(liveUserPosition[0] - smooth.x, liveUserPosition[1] - smooth.z);
 
-    // Smoothly glide line projection coordinate towards target
-    const lerpFactor = Math.min(1, delta * 8.5);
-    smoothPosRef.current[0] += (targetX - smoothPosRef.current[0]) * lerpFactor;
-    smoothPosRef.current[1] += (targetZ - smoothPosRef.current[1]) * lerpFactor;
+    if (distToTarget > 180) {
+      smooth.x = liveUserPosition[0];
+      smooth.z = liveUserPosition[1];
+    } else {
+      const damp = Math.min(1, 1 - Math.exp(-12 * delta));
+      smooth.x += (liveUserPosition[0] - smooth.x) * damp;
+      smooth.z += (liveUserPosition[1] - smooth.z) * damp;
+    }
 
-    const ux = smoothPosRef.current[0];
-    const uz = smoothPosRef.current[1];
+    const ux = smooth.x;
+    const uz = smooth.z;
 
     let minDistance = Infinity;
     let closestIndex = 0;
@@ -105,25 +109,31 @@ export default function DynamicNavigationRoute({
     if (bestProj && minDistance <= 65) {
       const projPoint = [bestProj.x, 18, bestProj.z];
 
-      const newCompleted = [
-        ...fullPoints3D.slice(0, closestIndex + 1),
-        projPoint,
-      ];
+      const last = lastProjRef.current;
+      const moved =
+        !last ||
+        closestIndex !== lastIndexRef.current ||
+        Math.hypot(projPoint[0] - last[0], projPoint[2] - last[2]) > 0.3;
 
-      const newRemaining = [
-        projPoint,
-        ...fullPoints3D.slice(closestIndex + 1),
-      ];
+      if (moved) {
+        lastProjRef.current = projPoint;
+        lastIndexRef.current = closestIndex;
 
-      setPoints({
-        completed: newCompleted,
-        remaining: newRemaining,
-      });
-    } else {
-      setPoints({
-        completed: [],
-        remaining: fullPoints3D,
-      });
+        const newCompleted = [
+          ...fullPoints3D.slice(0, closestIndex + 1),
+          projPoint,
+        ];
+
+        const newRemaining = [
+          projPoint,
+          ...fullPoints3D.slice(closestIndex + 1),
+        ];
+
+        setPoints({
+          completed: newCompleted,
+          remaining: newRemaining,
+        });
+      }
     }
   });
 
@@ -151,12 +161,6 @@ export default function DynamicNavigationRoute({
       <mesh position={[startWx, 14, startWz]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[14, 32]} />
         <meshBasicMaterial color="#00ff88" />
-      </mesh>
-
-      {/* Destination Location Floor Ring */}
-      <mesh position={[destWx, 14, destWz]} rotation={[-Math.PI / 2, 0, 0]}>
-        <ringGeometry args={[12, 20, 32]} />
-        <meshBasicMaterial color="#ff3838" />
       </mesh>
     </group>
   );

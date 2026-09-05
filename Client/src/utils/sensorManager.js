@@ -79,8 +79,31 @@ class SensorManager {
       dir = (360 - event.alpha) % 360;
     }
 
-    this.currentHeading = dir;
-    this.orientationCallbacks.forEach((cb) => cb(dir, event));
+    if (this.filteredHeading === null || this.filteredHeading === undefined) {
+      this.filteredHeading = dir;
+    } else {
+      // Shortest-arc circular angular difference (-180° to 180°)
+      let diff = ((dir - this.filteredHeading + 540) % 360) - 180;
+      const absDiff = Math.abs(diff);
+
+      // Google Maps-grade Adaptive Deadband & Dynamic Smoothing:
+      if (absDiff < 0.8) {
+        // Micro-tremor deadband: ignore tiny magnetometer noise when holding phone steady
+        return;
+      } else if (absDiff < 8) {
+        // Minor hand movements: strong low-pass filter for rock-solid stability
+        this.filteredHeading = (this.filteredHeading + diff * 0.20 + 360) % 360;
+      } else if (absDiff < 30) {
+        // Regular turns: smooth responsive filter
+        this.filteredHeading = (this.filteredHeading + diff * 0.40 + 360) % 360;
+      } else {
+        // Fast sharp turns: rapid tracking
+        this.filteredHeading = (this.filteredHeading + diff * 0.70 + 360) % 360;
+      }
+    }
+
+    this.currentHeading = this.filteredHeading;
+    this.orientationCallbacks.forEach((cb) => cb(this.filteredHeading, event));
   }
 
   handleMotion(event) {

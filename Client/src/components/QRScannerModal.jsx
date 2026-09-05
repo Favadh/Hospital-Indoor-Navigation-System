@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
+import { X, Lock, AlertTriangle, MapPin, Navigation, ArrowLeft, ArrowRight, Target } from 'lucide-react';
 import './QRScannerModal.css';
 
 /**
@@ -282,7 +283,7 @@ export default function QRScannerModal({
             </h3>
           </div>
           <button className="qr-modal-close" onClick={onClose} aria-label="Close">
-            ✖
+            <X size={18} />
           </button>
         </div>
 
@@ -309,7 +310,9 @@ export default function QRScannerModal({
               {/* Insecure Context Overlay */}
               {cameraState === 'insecure_context' && (
                 <div className="qr-state-overlay">
-                  <div className="qr-state-icon">🔒</div>
+                  <div className="qr-state-icon">
+                    <Lock size={24} color="#ffaa00" />
+                  </div>
                   <p className="qr-state-text qr-state-error" style={{ marginBottom: '14px' }}>
                     Camera access is blocked on HTTP network addresses.
                   </p>
@@ -328,7 +331,9 @@ export default function QRScannerModal({
               {/* Error Overlay */}
               {cameraState === 'error' && (
                 <div className="qr-state-overlay">
-                  <div className="qr-state-icon">⚠️</div>
+                  <div className="qr-state-icon">
+                    <AlertTriangle size={24} color="#ff4757" />
+                  </div>
                   <p className="qr-state-text qr-state-error">{errorMessage}</p>
                   <button className="qr-btn-retry" onClick={startScanner}>
                     Retry Camera
@@ -348,7 +353,7 @@ export default function QRScannerModal({
                       className="qr-btn-preset"
                       onClick={() => handleStartLocationSelected(loc)}
                     >
-                      📍 {loc}
+                      <Target size={13} style={{ marginRight: '5px' }} /> {loc}
                     </button>
                   )
                 )}
@@ -365,7 +370,7 @@ export default function QRScannerModal({
             {/* Start Location Confirmed Banner */}
             <div className="qr-location-summary-card">
               <div className="qr-location-summary-left">
-                
+                <Target size={18} color="#00ff88" style={{ marginRight: '8px', flexShrink: 0 }} />
                 <div>
                   <div className="qr-location-summary-label">Current Location</div>
                   <div className="qr-location-summary-val">{currentStart}</div>
@@ -384,7 +389,9 @@ export default function QRScannerModal({
 
             {/* Destination Dropdown */}
             <div className="qr-dest-field-group">
-              <label className="qr-field-label">🎯 Where do you want to go?</label>
+              <label className="qr-field-label" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <MapPin size={15} color="#ff4d4f" /> Where do you want to go?
+              </label>
               <select
                 className="qr-dest-dropdown"
                 value={selectedDest}
@@ -412,7 +419,7 @@ export default function QRScannerModal({
                       handleConfirmNavigation(dest);
                     }}
                   >
-                    <span>📍</span>
+                    <MapPin size={13} color="#ff4d4f" />
                     <span>{dest}</span>
                   </button>
                 ))}
@@ -429,14 +436,15 @@ export default function QRScannerModal({
                   setTimeout(() => startScanner(), 100);
                 }}
               >
-                ⬅ Back
+                <ArrowLeft size={15} style={{ marginRight: '6px' }} /> Back
               </button>
               <button
                 type="button"
                 className="qr-btn-start-nav"
                 onClick={() => handleConfirmNavigation(selectedDest)}
               >
-                Start 3D Navigation →
+                <span>Start 3D Navigation</span>
+                <ArrowRight size={15} style={{ marginLeft: '6px' }} />
               </button>
             </div>
           </div>

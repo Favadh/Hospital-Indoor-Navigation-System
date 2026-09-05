@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { MapPin, Target } from 'lucide-react';
 import { svgToWorld } from '../constants/mapConstants';
 import './NavigationBar.css';
 
@@ -61,7 +62,6 @@ export default function NavigationBar({
         {/* Card Header */}
         <div className="gmaps-planner-header">
           <div className="gmaps-planner-title">
-            <span className="gmaps-planner-icon">🏥</span>
             <h2>Route Planner</h2>
           </div>
 
@@ -88,7 +88,7 @@ export default function NavigationBar({
         <div className="gmaps-search-inputs">
           {/* Start Location Input */}
           <div className="gmaps-search-bar">
-            <span className="gmaps-input-pin gmaps-pin-start">📍</span>
+            <Target size={18} color="#00ff88" className="gmaps-input-pin gmaps-pin-start" />
             <select
               value={startName}
               onChange={(e) => onStartChange(e.target.value)}
@@ -105,7 +105,7 @@ export default function NavigationBar({
 
           {/* Destination Location Input */}
           <div className="gmaps-search-bar">
-            <span className="gmaps-input-pin gmaps-pin-dest">🎯</span>
+            <MapPin size={18} color="#ff4d4f" className="gmaps-input-pin gmaps-pin-dest" />
             <select
               value={destName || ''}
               onChange={(e) => onDestChange(e.target.value)}

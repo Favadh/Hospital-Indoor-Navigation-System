@@ -6,6 +6,7 @@ import ExtrudedWalls from './ExtrudedWalls';
 import DepartmentLabels from './DepartmentLabels';
 import DynamicNavigationRoute from './DynamicNavigationRoute';
 import LiveUserMarker from './LiveUserMarker';
+import DestinationPinpoint from './DestinationPinpoint';
 import { svgToWorld } from '../constants/mapConstants';
 
 /**
@@ -15,9 +16,9 @@ import { svgToWorld } from '../constants/mapConstants';
 function NavigationCameraController({
   routeData,
   isTrackingActive,
-  behindDistance = 900,
-  camHeight = 1100,
-  lookAheadDist = 120,
+  behindDistance = 450,
+  camHeight = 350,
+  lookAheadDist = 60,
 }) {
   const { camera } = useThree();
   const controls = useThree((state) => state.controls);
@@ -67,28 +68,40 @@ function NavigationCameraController({
  */
 function TrackUpCameraController({
   liveUserPosition,
-  liveHeading,
+  liveHeading = 0,
   isTrackUpActive,
+  isTrackingActive,
   onUserInteraction,
-  trackUpDistance = 500,
-  trackUpHeight = 600,
-  trackUpLookAhead = 100,
+  trackUpDistance = 450,
+  trackUpHeight = 350,
 }) {
   const { camera } = useThree();
   const controls = useThree((state) => state.controls);
 
-  const smoothCamPos = useRef(new THREE.Vector3());
-  const smoothTarget = useRef(new THREE.Vector3());
-  const hasSnapped = useRef(false);
-  const interactionDetected = useRef(false);
+  const smoothHeading = useRef(typeof liveHeading === 'number' ? liveHeading : 0);
+  const activationTimeRef = useRef(0);
+
+  // Follow user marker whenever isTrackUpActive is true
+  const isFollowing = Boolean(isTrackUpActive);
+
+  // Reset activation timer when recentering starts
+  useEffect(() => {
+    if (isTrackUpActive) {
+      activationTimeRef.current = Date.now();
+      if (typeof liveHeading === 'number') {
+        smoothHeading.current = liveHeading;
+      }
+    }
+  }, [isTrackUpActive, liveHeading]);
 
   // Detect user manual interaction (pan/rotate/zoom) on OrbitControls
   useEffect(() => {
     if (!controls) return;
 
     const handleStart = () => {
-      if (isTrackUpActive) {
-        interactionDetected.current = true;
+      // Only disengage if we are actively following AND not within the 400ms button tap cooldown
+      if (isTrackUpActive && Date.now() - activationTimeRef.current > 400) {
+        if (onUserInteraction) onUserInteraction();
       }
     };
 
@@ -96,36 +109,24 @@ function TrackUpCameraController({
     return () => {
       controls.removeEventListener('start', handleStart);
     };
-  }, [controls, isTrackUpActive]);
-
-  // When Track-Up is toggled off externally, reset snap flag
-  useEffect(() => {
-    if (!isTrackUpActive) {
-      hasSnapped.current = false;
-    }
-  }, [isTrackUpActive]);
+  }, [controls, isTrackUpActive, onUserInteraction]);
 
   useFrame((state) => {
-    if (!controls || !isTrackUpActive || !liveUserPosition) return;
-
-    // If user touched the screen while track-up was on, disengage
-    if (interactionDetected.current) {
-      interactionDetected.current = false;
-      if (onUserInteraction) onUserInteraction();
-      return;
-    }
+    if (!controls || !isFollowing || !liveUserPosition) return;
 
     const [ux, uz] = liveUserPosition;
+    const rad = typeof liveHeading === 'number' ? liveHeading : 0;
 
+    // Follow user position with friend's exact 0.05 lerp
     controls.target.lerp(new THREE.Vector3(ux, 15, uz), 0.05);
 
-    const rad = liveHeading;
-    const idealCameraPos = new THREE.Vector3(
+    // Camera positioned behind user marker based on heading with friend's exact 0.05 lerp
+    const idealCamPos = new THREE.Vector3(
       ux - Math.cos(rad) * trackUpDistance,
       trackUpHeight,
       uz - Math.sin(rad) * trackUpDistance
     );
-    state.camera.position.lerp(idealCameraPos, 0.05);
+    state.camera.position.lerp(idealCamPos, 0.05);
     controls.update();
   });
 
@@ -166,20 +167,10 @@ function DoubleTapOrbitController({ onUserInteraction }) {
     if (!controls) return;
     const s = stateRef.current;
 
-    const hasMomentum = Math.abs(s.velocityX) > 0.00005 || Math.abs(s.velocityY) > 0.00005;
-
-    if (s.isDoubleTapActive || hasMomentum) {
-      if (!s.isDoubleTapActive && hasMomentum) {
-        s.targetTheta += s.velocityX;
-        s.targetPhi += s.velocityY;
-        s.targetPhi = Math.max(0.05, Math.min(Math.PI / 2.05, s.targetPhi));
-        s.velocityX *= 0.92;
-        s.velocityY *= 0.92;
-      }
-
+    if (s.isDoubleTapActive) {
       const damp = Math.min(1, 1 - Math.exp(-14 * delta));
-      s.currentTheta = THREE.MathUtils.lerp(s.currentTheta, s.targetTheta, damp);
-      s.currentPhi = THREE.MathUtils.lerp(s.currentPhi, s.targetPhi, damp);
+      s.currentTheta += (s.targetTheta - s.currentTheta) * damp;
+      s.currentPhi += (s.targetPhi - s.currentPhi) * damp;
       s.currentPhi = Math.max(0.05, Math.min(Math.PI / 2.05, s.currentPhi));
 
       const offset = new THREE.Vector3();
@@ -187,11 +178,6 @@ function DoubleTapOrbitController({ onUserInteraction }) {
       offset.setFromSpherical(spherical);
       camera.position.copy(controls.target).add(offset);
       camera.lookAt(controls.target);
-
-      if (!s.isDoubleTapActive && !hasMomentum) {
-        controls.enabled = true;
-        controls.update();
-      }
     }
   });
 
@@ -324,8 +310,8 @@ export default function MapScene({
   liveUserPosition,
   liveHeading,
   isTrackingActive,
-  camBehindDistance = 480,
-  camHeight = 520,
+  camBehindDistance = 450,
+  camHeight = 350,
   isTrackUpActive = false,
   onTrackUpDisengage,
 }) {
@@ -338,6 +324,14 @@ export default function MapScene({
   const handleUserInteraction = useCallback(() => {
     if (disengageRef.current) disengageRef.current();
   }, []);
+
+  // Compute destination 3D world coordinates for Pinpoint marker
+  const destPos = React.useMemo(() => {
+    if (!destName || !nodes || nodes.length === 0) return null;
+    const destNode = nodes.find((n) => n.name === destName);
+    if (!destNode) return null;
+    return svgToWorld(destNode.x, destNode.y);
+  }, [destName, nodes]);
 
   return (
     <main
@@ -352,43 +346,53 @@ export default function MapScene({
     >
       <Canvas
         style={{ width: '100%', height: '100%', display: 'block' }}
+        frameloop="always"
         camera={{
-          position: [0, 950, 1050],
-          fov: 50,
+          position: [0, 1600, 1600],
+          fov: 35,
           near: 1,
-          far: 6000,
+          far: 10000,
         }}
-        dpr={[1, 2]}
+        gl={{
+          powerPreference: 'high-performance',
+          antialias: true,
+          alpha: false,
+          stencil: false,
+          depth: true,
+          precision: 'highp',
+          preserveDrawingBuffer: false,
+        }}
+        dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 1.5)]}
         shadows
       >
-        {/* --- Lighting --- */}
-        <ambientLight intensity={1.0} />
+        {/* --- 120 FPS High-Performance Lighting --- */}
+        <ambientLight intensity={1.1} />
 
         <directionalLight
           position={[600, 1200, 500]}
-          intensity={3.0}
+          intensity={2.6}
           castShadow
-          shadow-mapSize-width={2048}
-          shadow-mapSize-height={2048}
+          shadow-mapSize-width={1024}
+          shadow-mapSize-height={1024}
+          shadow-bias={-0.0004}
         />
 
         <directionalLight
           position={[-500, 800, -400]}
-          intensity={1.5}
+          intensity={1.2}
           color="#ffffff"
         />
 
-        <Environment preset="city" />
+        <hemisphereLight
+          groundColor="#1e272e"
+          color="#dfe6e9"
+          intensity={0.5}
+        />
 
         <React.Suspense fallback={null}>
           <ExtrudedWalls />
           {nodes && nodes.length > 0 && (
-            <DepartmentLabels
-              nodes={nodes}
-              startName={startName}
-              destName={destName}
-              routeData={routeData}
-            />
+            <DepartmentLabels nodes={nodes} />
           )}
           {routeData && (
             <DynamicNavigationRoute
@@ -397,6 +401,9 @@ export default function MapScene({
               isTrackingActive={isTrackingActive}
             />
           )}
+
+          {/* 3D Animated Pinpoint Marker at Destination */}
+          {destPos && <DestinationPinpoint position={destPos} />}
 
           {/* Live User Movement Marker */}
           {liveUserPosition && (
@@ -408,15 +415,15 @@ export default function MapScene({
           )}
         </React.Suspense>
 
-        {/* 3D Orbit Controls */}
+        {/* 3D Orbit Controls with Friend's Exact Damping & Momentum */}
         <OrbitControls
           makeDefault
           target={[0, 0, 0]}
-          maxPolarAngle={Math.PI / 2.05}
-          minDistance={150}
-          maxDistance={2500}
+          maxPolarAngle={Math.PI / 2.2}
+          minDistance={100}
+          maxDistance={6000}
           enableDamping={true}
-          dampingFactor={0.07}
+          dampingFactor={0.05}
           panSpeed={1.0}
           rotateSpeed={0.85}
           zoomSpeed={0.95}
@@ -439,7 +446,10 @@ export default function MapScene({
           liveUserPosition={liveUserPosition}
           liveHeading={liveHeading}
           isTrackUpActive={isTrackUpActive}
+          isTrackingActive={isTrackingActive}
           onUserInteraction={handleUserInteraction}
+          trackUpDistance={camBehindDistance}
+          trackUpHeight={camHeight}
         />
 
         <DoubleTapOrbitController onUserInteraction={handleUserInteraction} />
