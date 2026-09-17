@@ -33,6 +33,18 @@ export default function HomePage() {
       .catch(() => console.log('Nodes fetch deferred'));
   }, []);
 
+  // If user opens a QR code link landing on the root URL (/?start=...), forward to /map
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const startParam = params.get('start') || params.get('from') || params.get('location');
+    const destParam = params.get('destination') || params.get('dest');
+    if (startParam && destParam) {
+      navigate(`/map?start=${encodeURIComponent(startParam)}&destination=${encodeURIComponent(destParam)}`, { replace: true });
+    } else if (startParam) {
+      navigate(`/map?start=${encodeURIComponent(startParam)}`, { replace: true });
+    }
+  }, [navigate]);
+
   const handleScanSuccess = (scanResult) => {
     setShowScannerModal(false);
     const start = typeof scanResult === 'object' ? scanResult.start : scanResult;
@@ -55,7 +67,7 @@ export default function HomePage() {
       {/* ===================================================================== */}
       <section className="hero-section">
         <div className="hero-badge">
-          <Sparkles size={14} color="#00ff88" style={{ marginRight: '6px' }} /> Smart 2.5D Indoor Wayfinding System
+          <Sparkles size={14} color="#00ff88" style={{ marginRight: '6px' }} /> Smart 3D Indoor Wayfinding System
         </div>
 
         <h1 className="hero-title">

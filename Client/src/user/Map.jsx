@@ -31,6 +31,7 @@ export default function Map() {
   const [isLoading, setIsLoading] = useState(true);
   const [serverError, setServerError] = useState(false);
   const [showScannerModal, setShowScannerModal] = useState(false);
+  const [scannerInitialStart, setScannerInitialStart] = useState('');
   const [showArrivalModal, setShowArrivalModal] = useState(false);
 
   // Navigation State
@@ -167,38 +168,64 @@ export default function Map() {
         } else {
           setNodes(fetchedNodes);
 
-          const queryStart = searchParams.get('start');
-          const queryDest = searchParams.get('destination');
+          const queryStart = searchParams.get('start') || searchParams.get('from') || searchParams.get('location');
+          const queryDest = searchParams.get('destination') || searchParams.get('dest');
 
-          let initialStart = queryStart || '';
-          let initialDest = queryDest || '';
+          if (queryStart && !queryDest) {
+            // URL opened from QR Code at an Entrance -> Open destination picker modal directly
+            const matchedNode = fetchedNodes.find(
+              (n) => n.name.toLowerCase() === queryStart.trim().toLowerCase()
+            );
+            const resolvedStartName = matchedNode ? matchedNode.name : queryStart;
 
-          if (!initialStart) {
-            const firstEntrance = fetchedNodes.find((n) => n.type === 'entrance');
-            if (firstEntrance) initialStart = firstEntrance.name;
+            setStartName(resolvedStartName);
+            setDestName('');
+            setRouteData(null);
+            setScannerInitialStart(resolvedStartName);
+            setShowScannerModal(true);
+
+            const startNode = matchedNode || fetchedNodes[0];
+            let startX = 0;
+            let startZ = 0;
+            if (startNode) {
+              const [wx, wz] = svgToWorld(startNode.x, startNode.y);
+              startX = wx;
+              startZ = wz;
+            }
+
+            setLiveUserPos([startX, startZ]);
+            pdrEngine.start(startX, startZ);
+            sensorManager.start().catch(() => {});
+          } else {
+            let initialStart = queryStart || '';
+            let initialDest = queryDest || '';
+
+            if (!initialStart) {
+              const firstEntrance = fetchedNodes.find((n) => n.type === 'entrance');
+              if (firstEntrance) initialStart = firstEntrance.name;
+            }
+
+            if (!initialDest) {
+              const firstRoom = fetchedNodes.find((n) => n.type === 'room');
+              if (firstRoom) initialDest = firstRoom.name;
+            }
+
+            setStartName(initialStart);
+            setDestName(initialDest);
+
+            const startNode = fetchedNodes.find((n) => n.name === initialStart) || fetchedNodes[0];
+            let startX = 0;
+            let startZ = 0;
+            if (startNode) {
+              const [wx, wz] = svgToWorld(startNode.x, startNode.y);
+              startX = wx;
+              startZ = wz;
+            }
+
+            setLiveUserPos([startX, startZ]);
+            pdrEngine.start(startX, startZ);
+            sensorManager.start().catch(() => {});
           }
-
-          if (!initialDest) {
-            const firstRoom = fetchedNodes.find((n) => n.type === 'room');
-            if (firstRoom) initialDest = firstRoom.name;
-          }
-
-          setStartName(initialStart);
-          setDestName(initialDest);
-
-          const startNode = fetchedNodes.find((n) => n.name === initialStart) || fetchedNodes[0];
-          let startX = 0;
-          let startZ = 0;
-          if (startNode) {
-            const [wx, wz] = svgToWorld(startNode.x, startNode.y);
-            startX = wx;
-            startZ = wz;
-          }
-
-          setLiveUserPos([startX, startZ]);
-
-          pdrEngine.start(startX, startZ);
-          sensorManager.start().catch(() => {});
         }
       } catch {
         setServerError(true);
@@ -515,9 +542,13 @@ export default function Map() {
 
       <QRScannerModal
         isOpen={showScannerModal}
-        onClose={() => setShowScannerModal(false)}
+        onClose={() => {
+          setShowScannerModal(false);
+          setScannerInitialStart('');
+        }}
         onScanSuccess={handleScanSuccess}
         availableNodes={nodes}
+        initialStart={scannerInitialStart}
       />
     </div>
   );

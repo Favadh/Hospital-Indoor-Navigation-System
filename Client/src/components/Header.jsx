@@ -4,6 +4,7 @@ import './Header.css';
 
 export default function Header() {
   const location = useLocation();
+  const isHomePage = location.pathname === '/';
 
   return (
     <header className="floating-header">
@@ -17,14 +18,25 @@ export default function Header() {
 
       {/* Navigation Links */}
       <nav className="floating-nav-links">
-        <Link
-          to="/"
-          className={`floating-nav-item ${
-            location.pathname === '/' ? 'active' : 'inactive'
-          }`}
-        >
-          Home
-        </Link>
+        {isHomePage ? (
+          <Link
+            to="/admin"
+            className={`floating-nav-item ${
+              location.pathname.startsWith('/admin') ? 'active' : 'inactive'
+            }`}
+          >
+            Admin
+          </Link>
+        ) : (
+          <Link
+            to="/"
+            className={`floating-nav-item ${
+              location.pathname === '/' ? 'active' : 'inactive'
+            }`}
+          >
+            Home
+          </Link>
+        )}
 
         <Link
           to="/map"

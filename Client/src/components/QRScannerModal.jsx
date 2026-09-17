@@ -92,12 +92,13 @@ export default function QRScannerModal({
   onClose,
   onScanSuccess,
   availableNodes = [],
+  initialStart = '',
 }) {
   const scannerRef = useRef(null);
   const hasHandledScanRef = useRef(false);
 
-  const [step, setStep] = useState(1); // 1 = Scan Start Location, 2 = Select Destination
-  const [currentStart, setCurrentStart] = useState('');
+  const [step, setStep] = useState(initialStart ? 2 : 1); // 1 = Scan Start Location, 2 = Select Destination
+  const [currentStart, setCurrentStart] = useState(initialStart || '');
   const [selectedDest, setSelectedDest] = useState('');
 
   const [cameraState, setCameraState] = useState('active'); // 'active' | 'error' | 'insecure_context'
@@ -255,11 +256,19 @@ export default function QRScannerModal({
   // Reset modal when reopened
   useEffect(() => {
     if (isOpen) {
-      setStep(1);
-      setCurrentStart('');
-      setSelectedDest('');
-      hasHandledScanRef.current = false;
-      startScanner();
+      if (initialStart) {
+        setCurrentStart(initialStart);
+        const defaultDest =
+          destinationOptions.find((n) => n.name !== initialStart)?.name || 'Pharmacy';
+        setSelectedDest(defaultDest);
+        setStep(2);
+      } else {
+        setStep(1);
+        setCurrentStart('');
+        setSelectedDest('');
+        hasHandledScanRef.current = false;
+        startScanner();
+      }
     } else {
       stopCamera();
     }
@@ -267,7 +276,7 @@ export default function QRScannerModal({
     return () => {
       stopCamera();
     };
-  }, [isOpen]);
+  }, [isOpen, initialStart]);
 
   if (!isOpen) return null;
 
