@@ -7,6 +7,7 @@ import floorRoutes from './routes/floorRoutes.js';
 import nodeRoutes from './routes/nodeRoutes.js';
 import edgeRoutes from './routes/edgeRoutes.js';
 import navigationRoutes from './routes/navigationRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -44,6 +45,7 @@ app.use('/api/floors', floorRoutes);
 app.use('/api/nodes', nodeRoutes);
 app.use('/api/edges', edgeRoutes);
 app.use('/api/navigation', navigationRoutes);
+app.use('/api/admins', adminRoutes);
 
 // Connect to MongoDB & Start Server on All Interfaces (0.0.0.0)
 const startServer = async () => {

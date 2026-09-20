@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import Floor from './model/floor.js';
 import Node from './model/node.js';
 import Edge from './model/edge.js';
+import Admin from './model/admin.js';
 
 dotenv.config();
 
@@ -160,6 +161,7 @@ const seedDatabase = async () => {
     await Floor.deleteMany({});
     await Node.deleteMany({});
     await Edge.deleteMany({});
+    await Admin.deleteMany({});
 
     console.log('🌱 Inserting Floor data...');
     await Floor.create(floorData);
@@ -169,6 +171,37 @@ const seedDatabase = async () => {
 
     console.log(`🌱 Inserting ${edgesData.length} Edges...`);
     await Edge.insertMany(edgesData);
+
+    console.log('🌱 Inserting Admin accounts...');
+    await Admin.insertMany([
+      {
+        username: 'admin',
+        email: 'admin@hospital.medinav.io',
+        password: 'admin123',
+        role: 'Super Admin',
+        status: 'Active',
+        lastLogin: new Date(),
+        avatarColor: '#00ff88',
+      },
+      {
+        username: 'sjenkins',
+        email: 's.jenkins@hospital.medinav.io',
+        password: 'admin123',
+        role: 'Spatial Editor',
+        status: 'Inactive',
+        lastLogin: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        avatarColor: '#4285F4',
+      },
+      {
+        username: 'it_operations',
+        email: 'it-support@hospital.medinav.io',
+        password: 'admin123',
+        role: 'Hospital Staff',
+        status: 'Inactive',
+        lastLogin: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        avatarColor: '#a855f7',
+      },
+    ]);
 
     console.log('🎉 Database Seeding Completed Successfully!');
     process.exit(0);
