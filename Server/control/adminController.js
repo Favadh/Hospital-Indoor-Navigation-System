@@ -1,4 +1,5 @@
 import Admin from '../model/admin.js';
+import jwt from 'jsonwebtoken';
 
 // Vibrant color palette for random admin avatars
 const AVATAR_COLORS = [
@@ -9,27 +10,6 @@ const AVATAR_COLORS = [
 
 const getRandomColor = () => {
   return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
-};
-
-// Helper to ensure default super admin exists
-const ensureDefaultAdmin = async () => {
-  try {
-    const count = await Admin.countDocuments();
-    if (count === 0) {
-      await Admin.create({
-        username: 'admin',
-        email: 'admin@hospital.medinav.io',
-        password: 'admin123',
-        role: 'Super Admin',
-        status: 'Active',
-        lastLogin: new Date(),
-        avatarColor: getRandomColor(),
-      });
-      console.log('🌱 Auto-seeded default Super Admin (admin / admin123)');
-    }
-  } catch (err) {
-    // Ignore duplicate key or connection errors during race conditions
-  }
 };
 
 // 1. Create a new Administrator (No 'name', only 'username', 'email', 'password', 'role', 'status')
@@ -94,8 +74,6 @@ export const createAdmin = async (req, res) => {
 // 2. Get all Administrators (with optional search query matching username/email/role and filters)
 export const getAdmins = async (req, res) => {
   try {
-    await ensureDefaultAdmin();
-
     const { q, role, status } = req.query;
     const filter = {};
 
@@ -268,8 +246,6 @@ export const deleteAdmin = async (req, res) => {
 // 6. Admin Login: sets status to 'Active' and updates lastLogin
 export const loginAdmin = async (req, res) => {
   try {
-    await ensureDefaultAdmin();
-
     const { username, password } = req.body;
 
     if (!username || !password) {
@@ -301,9 +277,23 @@ export const loginAdmin = async (req, res) => {
     const safeAdmin = admin.toObject();
     delete safeAdmin.password;
 
+    // Generate JWT token matching tecxell26 pattern
+    const payload = {
+      id: admin._id,
+      username: admin.username,
+      role: admin.role,
+    };
+
+    const token = jwt.sign(
+      payload,
+      process.env.JWT_SECRET || 'medinav_jwt_secret_super_key_2026_secure',
+      { expiresIn: '4h' }
+    );
+
     return res.status(200).json({
       success: true,
       message: 'Login successful',
+      token,
       data: safeAdmin,
     });
   } catch (error) {
@@ -325,6 +315,8 @@ export const logoutAdmin = async (req, res) => {
       admin = await Admin.findById(id);
     } else if (username) {
       admin = await Admin.findOne({ username: username.trim().toLowerCase() });
+    } else if (req.user?.id) {
+      admin = await Admin.findById(req.user.id);
     }
 
     if (admin) {
@@ -340,6 +332,39 @@ export const logoutAdmin = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Error during logout',
+      error: error.message,
+    });
+  }
+};
+
+// 8. Get Authenticated Admin Profile (from JWT req.user.id)
+export const getAdminProfile = async (req, res) => {
+  try {
+    const adminId = req.user?.id;
+    if (!adminId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: No admin id in token payload',
+      });
+    }
+
+    const admin = await Admin.findById(adminId).select('-password');
+    if (!admin) {
+      return res.status(404).json({
+        success: false,
+        message: 'Administrator not found',
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: admin,
+      name: admin.username,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: 'Error fetching administrator profile',
       error: error.message,
     });
   }

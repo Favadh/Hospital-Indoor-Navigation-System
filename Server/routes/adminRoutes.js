@@ -7,22 +7,27 @@ import {
   deleteAdmin,
   loginAdmin,
   logoutAdmin,
+  getAdminProfile,
 } from '../control/adminController.js';
+import auth from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Authentication Routes
+// Public Authentication Routes
 router.post('/login', loginAdmin);
-router.post('/logout', logoutAdmin);
 
-// Admin CRUD Routes
+// Protected Authentication / Profile Routes
+router.get('/profile', auth, getAdminProfile);
+router.post('/logout', auth, logoutAdmin);
+
+// Protected Admin CRUD Routes
 router.route('/')
-  .get(getAdmins)
-  .post(createAdmin);
+  .get(auth, getAdmins)
+  .post(auth, createAdmin);
 
 router.route('/:id')
-  .get(getAdminById)
-  .put(updateAdmin)
-  .delete(deleteAdmin);
+  .get(auth, getAdminById)
+  .put(auth, updateAdmin)
+  .delete(auth, deleteAdmin);
 
 export default router;

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import api from '../utils/axiosInstance';
+import api from '../utils/axios';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
 import MapScene from '../components/MapScene';

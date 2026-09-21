@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import Header from '../components/Header';
 import QRScannerModal from '../components/QRScannerModal';
-import api from '../utils/axiosInstance';
+import api from '../utils/axios';
 import './HomePage.css';
 
 export default function HomePage() {
