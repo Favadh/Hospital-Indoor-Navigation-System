@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../utils/axios';
 import Header from '../components/Header';
 import NavigationBar from '../components/NavigationBar';
@@ -27,6 +27,10 @@ function getCardinalDirection(deg) {
  */
 export default function Map() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const isAdminView = searchParams.get('mode') === 'admin' || searchParams.get('admin') === 'true';
+  const floorParam = searchParams.get('floor');
+
   const [nodes, setNodes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [serverError, setServerError] = useState(false);
@@ -386,84 +390,108 @@ export default function Map() {
 
   return (
     <div className="map-page-container">
-      <Header />
+      {!isAdminView && <Header />}
 
-      {/* Top Google Maps Route Planner Card */}
-      <NavigationBar
-        startName={startName}
-        destName={destName}
-        onStartChange={handleStartChange}
-        onDestChange={handleDestChange}
-        onFindRoute={handleFindRoute}
-        onClearRoute={handleClearRoute}
-        isNavigating={isNavigating}
-        routeData={routeData}
-        navError={navError}
-        selectableStartNodes={selectableStartNodes}
-        selectableDestNodes={selectableDestNodes}
-        isTrackingActive={isTrackingActive}
-        onOpenScanner={() => setShowScannerModal(true)}
-      />
+      {/* Top Google Maps Route Planner Card (Hidden in Admin 3D Inspector View) */}
+      {!isAdminView && (
+        <NavigationBar
+          startName={startName}
+          destName={destName}
+          onStartChange={handleStartChange}
+          onDestChange={handleDestChange}
+          onFindRoute={handleFindRoute}
+          onClearRoute={handleClearRoute}
+          isNavigating={isNavigating}
+          routeData={routeData}
+          navError={navError}
+          selectableStartNodes={selectableStartNodes}
+          selectableDestNodes={selectableDestNodes}
+          isTrackingActive={isTrackingActive}
+          onOpenScanner={() => setShowScannerModal(true)}
+        />
+      )}
+
+      {/* Admin Floating Control Toolbar */}
+      {isAdminView && (
+        <div className="admin-3d-floating-bar animate-fade-in">
+          <button
+            type="button"
+            className="admin-3d-back-btn"
+            onClick={() => navigate('/admin/dashboard')}
+          >
+            ← Back to Dashboard
+          </button>
+          <div className="admin-3d-badge">
+            <span className="admin-3d-dot" />
+            <span>3D Spatial Map • Level {floorParam ?? 0}</span>
+          </div>
+          <div className="admin-3d-hint">
+            Rotate: Left-Drag • Pan: Right-Drag • Zoom: Scroll
+          </div>
+        </div>
+      )}
 
       {/* 3D Canvas Scene */}
       <MapScene
         nodes={nodes}
-        routeData={routeData}
+        routeData={isAdminView ? null : routeData}
         startName={startName}
         destName={destName}
         liveUserPosition={liveUserPos}
         liveHeading={liveHeading}
-        isTrackingActive={isTrackingActive}
+        isTrackingActive={isAdminView ? false : isTrackingActive}
         camBehindDistance={camBehindDistance}
         camHeight={camHeight}
-        isTrackUpActive={isTrackUpActive}
+        isTrackUpActive={isAdminView ? false : isTrackUpActive}
         onTrackUpDisengage={() => setIsTrackUpActive(false)}
       />
 
       {/* ─────────────────────────────────────────────────────────────
           RIGHT-SIDE FLOATING ACTION BUTTONS (Google Maps Style)
       ───────────────────────────────────────────────────────────── */}
-      <div className="gmaps-right-fabs">
-        {/* Recenter / Compass FAB */}
-        <button
-          className={`gmaps-fab gmaps-fab-recenter ${isTrackUpActive ? 'active' : ''}`}
-          onPointerDown={(e) => e.stopPropagation()}
-          onTouchStart={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsTrackUpActive(true);
-          }}
-          title={isTrackUpActive ? 'Following route (Click to free pan)' : 'Re-center on user marker'}
-          aria-label="Re-center camera"
-          type="button"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            width="22"
-            height="22"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="gmaps-recenter-svg"
+      {!isAdminView && (
+        <div className="gmaps-right-fabs">
+          {/* Recenter / Compass FAB */}
+          <button
+            className={`gmaps-fab gmaps-fab-recenter ${isTrackUpActive ? 'active' : ''}`}
+            onPointerDown={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsTrackUpActive(true);
+            }}
+            title={isTrackUpActive ? 'Following route (Click to free pan)' : 'Re-center on user marker'}
+            aria-label="Re-center camera"
+            type="button"
           >
-            <circle cx="12" cy="12" r="8" />
-            <line x1="12" y1="2" x2="12" y2="4" />
-            <line x1="12" y1="20" x2="12" y2="22" />
-            <line x1="2" y1="12" x2="4" y2="12" />
-            <line x1="20" y1="12" x2="22" y2="12" />
-            <circle cx="12" cy="12" r="3" fill="currentColor" />
-          </svg>
-          {isTrackUpActive && <span className="gmaps-fab-pulse" />}
-        </button>
-      </div>
+            <svg
+              viewBox="0 0 24 24"
+              width="22"
+              height="22"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="gmaps-recenter-svg"
+            >
+              <circle cx="12" cy="12" r="8" />
+              <line x1="12" y1="2" x2="12" y2="4" />
+              <line x1="12" y1="20" x2="12" y2="22" />
+              <line x1="2" y1="12" x2="4" y2="12" />
+              <line x1="20" y1="12" x2="22" y2="12" />
+              <circle cx="12" cy="12" r="3" fill="currentColor" />
+            </svg>
+            {isTrackUpActive && <span className="gmaps-fab-pulse" />}
+          </button>
+        </div>
+      )}
 
       {/* ─────────────────────────────────────────────────────────────
           BOTTOM NAVIGATION CARD (Friend's Exact Google Maps UX)
       ───────────────────────────────────────────────────────────── */}
-      {isRouteActive && isTrackingActive ? (
+      {!isAdminView && isRouteActive && isTrackingActive ? (
         <div className="gmaps-active-nav-card animate-slide-up">
           {stepsRemaining > 0 ? (
             <>
@@ -514,7 +542,7 @@ export default function Map() {
       {/* ─────────────────────────────────────────────────────────────
           CELEBRATORY ARRIVAL MODAL
       ───────────────────────────────────────────────────────────── */}
-      {showArrivalModal && (
+      {!isAdminView && showArrivalModal && (
         <div className="arrival-modal-overlay" onClick={() => setShowArrivalModal(false)}>
           <div className="arrival-modal-content animate-pop-in" onClick={(e) => e.stopPropagation()}>
             <div className="arrival-icon-wrapper">
@@ -540,16 +568,18 @@ export default function Map() {
         </div>
       )}
 
-      <QRScannerModal
-        isOpen={showScannerModal}
-        onClose={() => {
-          setShowScannerModal(false);
-          setScannerInitialStart('');
-        }}
-        onScanSuccess={handleScanSuccess}
-        availableNodes={nodes}
-        initialStart={scannerInitialStart}
-      />
+      {!isAdminView && (
+        <QRScannerModal
+          isOpen={showScannerModal}
+          onClose={() => {
+            setShowScannerModal(false);
+            setScannerInitialStart('');
+          }}
+          onScanSuccess={handleScanSuccess}
+          availableNodes={nodes}
+          initialStart={scannerInitialStart}
+        />
+      )}
     </div>
   );
 }

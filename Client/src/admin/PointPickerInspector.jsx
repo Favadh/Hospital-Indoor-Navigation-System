@@ -6,13 +6,22 @@ const SVG_H = 1080;
 // ============================================================================
 // POINT & CLICK INSPECTOR COMPONENT (Admin Module / Dev Tools)
 // ============================================================================
-export default function PointPickerInspector({ onClose, nodes = [], edges = [] }) {
+export default function PointPickerInspector({ onClose, map = null, nodes = [], edges = [] }) {
   const [clickedPin, setClickedPin] = useState(null);
   const [clickHistory, setClickHistory] = useState([]);
   const [copiedIndex, setCopiedIndex] = useState(null);
 
+  const svgSrc = map?.svgFile || '/Hospital G.svg';
+  const SVG_W = map?.svgWidth || 1920;
+  const SVG_H = map?.svgHeight || 1080;
+  const mapName = map?.name || 'Hospital Map';
+
+  const relevantNodes = map && map.level !== undefined
+    ? nodes.filter((n) => n.floor === undefined || n.floor === map.level)
+    : nodes;
+
   const nodeMap = new Map();
-  nodes.forEach((n) => nodeMap.set(n.name, n));
+  relevantNodes.forEach((n) => nodeMap.set(n.name, n));
 
   const handleMapClick = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -54,8 +63,8 @@ export default function PointPickerInspector({ onClose, nodes = [], edges = [] }
         alignItems: 'center', borderBottom: '2px solid #00ff88'
       }}>
         <div>
-          <h2 style={{ margin: 0, color: '#00ff88', fontSize: '1.2rem' }}>🎯 Point Inspector (Admin & Dev Coordinate Tool)</h2>
-          <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', opacity: 0.7 }}>Click anywhere to see exact X, Y coordinates on your map!</p>
+          <h2 style={{ margin: 0, color: '#00ff88', fontSize: '1.2rem' }}>🎯 Graph Editor & Point Inspector — {mapName}</h2>
+          <p style={{ margin: '2px 0 0 0', fontSize: '0.8rem', opacity: 0.7 }}>Click anywhere on the {SVG_W}×{SVG_H} blueprint to inspect exact coordinates.</p>
         </div>
         <button onClick={onClose} style={{ padding: '8px 18px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
           ✖ Close Inspector
@@ -66,8 +75,8 @@ export default function PointPickerInspector({ onClose, nodes = [], edges = [] }
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {/* Left Map View with SVG + Full Graph Overlay */}
         <div style={{ flex: 1, padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-          <div style={{ position: 'relative', width: '100%', maxWidth: '1200px', aspectRatio: '16/9', border: '2px solid #00ff88', borderRadius: '8px', overflow: 'hidden', cursor: 'crosshair', background: '#ffffff' }} onClick={handleMapClick}>
-            <img src="/Hospital G.svg" alt="Hospital Map" style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }} />
+          <div style={{ position: 'relative', width: '100%', maxWidth: '1200px', aspectRatio: `${SVG_W}/${SVG_H}`, border: '2px solid #00ff88', borderRadius: '8px', overflow: 'hidden', cursor: 'crosshair', background: '#ffffff' }} onClick={handleMapClick}>
+            <img src={svgSrc} alt={mapName} style={{ width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' }} />
 
             {/* 2D SVG Overlay of EDGES */}
             <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none' }} viewBox={`0 0 ${SVG_W} ${SVG_H}`}>

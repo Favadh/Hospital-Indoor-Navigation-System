@@ -88,6 +88,9 @@ export default function AdminPage() {
   const [nodes, setNodes] = useState(FALLBACK_NODES);
   const [showInspector, setShowInspector] = useState(false);
 
+  // Maps/Floors Count
+  const [mapsCount, setMapsCount] = useState(1);
+
   // Toast Notification State
   const [toast, setToast] = useState(null);
 
@@ -197,6 +200,7 @@ export default function AdminPage() {
           setMobileMenuOpen={setMobileMenuOpen}
           adminsCount={adminsList.length}
           nodesCount={nodes.length}
+          mapsCount={mapsCount}
           currentAdminUser={currentAdminUser}
           onLogout={handleLogout}
         />
@@ -234,8 +238,9 @@ export default function AdminPage() {
 
           {activeTab === 'maps' && (
             <MapsTab
+              onMapsCountChange={(count) => setMapsCount(count)}
+              showToast={showToast}
               nodes={nodes}
-              onOpenInspector={() => setShowInspector(true)}
             />
           )}
         </main>

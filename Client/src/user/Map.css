@@ -450,3 +450,83 @@
     font-size: 0.76rem;
   }
 }
+
+/* ─────────────────────────────────────────────────────────────
+   Admin 3D Blueprint Inspector Floating Control Bar
+───────────────────────────────────────────────────────────── */
+.admin-3d-floating-bar {
+  position: fixed;
+  top: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(13, 18, 31, 0.92);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+  padding: 8px 16px;
+  border-radius: 40px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7), 0 0 20px rgba(0, 255, 136, 0.15);
+  pointer-events: auto;
+}
+
+.admin-3d-back-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #f1f5f9;
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.admin-3d-back-btn:hover {
+  background: rgba(0, 255, 136, 0.15);
+  border-color: #00ff88;
+  color: #00ff88;
+  transform: translateY(-1px);
+}
+
+.admin-3d-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.2px;
+}
+
+.admin-3d-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #00ff88;
+  box-shadow: 0 0 8px #00ff88;
+}
+
+.admin-3d-hint {
+  font-size: 0.72rem;
+  color: #64748b;
+  font-weight: 500;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  padding-left: 12px;
+}
+
+@media (max-width: 680px) {
+  .admin-3d-floating-bar {
+    width: 90%;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 16px;
+  }
+  .admin-3d-hint {
+    display: none;
+  }
+}

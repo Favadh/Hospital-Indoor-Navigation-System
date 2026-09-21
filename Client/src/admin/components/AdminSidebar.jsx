@@ -21,6 +21,7 @@ export default function AdminSidebar({
   setMobileMenuOpen,
   adminsCount,
   nodesCount,
+  mapsCount,
   currentAdminUser,
   onLogout,
 }) {
@@ -98,7 +99,7 @@ export default function AdminSidebar({
           >
             <MapIcon size={20} />
             <span>Maps</span>
-            <span className="nav-badge">{nodesCount}</span>
+            <span className="nav-badge">{mapsCount !== undefined ? mapsCount : nodesCount}</span>
           </button>
         </nav>
 

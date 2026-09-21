@@ -3,11 +3,17 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 
+import path from 'path';
+import { fileURLToPath } from 'url';
+
 import floorRoutes from './routes/floorRoutes.js';
 import nodeRoutes from './routes/nodeRoutes.js';
 import edgeRoutes from './routes/edgeRoutes.js';
 import navigationRoutes from './routes/navigationRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables from .env file
 dotenv.config();
@@ -29,8 +35,11 @@ app.use((req, res, next) => {
 });
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Serve static assets & SVG blueprints
+app.use(express.static(path.join(__dirname, '../Client/public')));
 
 // Health Check Route
 app.get('/', (req, res) => {
