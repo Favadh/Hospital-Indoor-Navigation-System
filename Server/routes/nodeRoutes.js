@@ -5,9 +5,12 @@ import {
   getNodeById,
   updateNode,
   deleteNode,
+  syncGraph,
 } from '../control/nodeController.js';
 
 const router = express.Router();
+
+router.post('/sync-graph', syncGraph);
 
 router.route('/')
   .post(createNode)

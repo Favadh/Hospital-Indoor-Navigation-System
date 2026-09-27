@@ -142,7 +142,6 @@ const edgesData = edgeConnections.map(([from, to]) => ({
   from,
   to,
   weight: dist(from, to),
-  bidirectional: true,
   floor: 'ground',
 }));
 

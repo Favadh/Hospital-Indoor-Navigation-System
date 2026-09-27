@@ -42,7 +42,7 @@ export const createEdge = async (req, res) => {
       });
     }
 
-    const { from, to, weight, bidirectional, floor } = data;
+    const { from, to, weight, floor } = data;
 
     if (!from || !to) {
       return res.status(400).json({
@@ -60,7 +60,6 @@ export const createEdge = async (req, res) => {
       from,
       to,
       weight: calculatedWeight,
-      bidirectional: bidirectional !== undefined ? bidirectional : true,
       floor,
     });
 
@@ -105,7 +104,11 @@ export const getEdges = async (req, res) => {
 export const getEdgeById = async (req, res) => {
   try {
     const { id } = req.params;
-    const edge = await Edge.findById(id);
+    let edge = null;
+
+    if (id && /^[0-9a-fA-F]{24}$/.test(id)) {
+      edge = await Edge.findById(id);
+    }
 
     if (!edge) {
       return res.status(404).json({
@@ -127,19 +130,37 @@ export const getEdgeById = async (req, res) => {
   }
 };
 
-// Update Edge by MongoDB _id
+// Update Edge by MongoDB _id or connection endpoints
 export const updateEdge = async (req, res) => {
   try {
     const { id } = req.params;
-    const updatedEdge = await Edge.findByIdAndUpdate(id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    let updatedEdge = null;
+
+    if (id && /^[0-9a-fA-F]{24}$/.test(id)) {
+      updatedEdge = await Edge.findByIdAndUpdate(id, req.body, {
+        new: true,
+        runValidators: true,
+      });
+    }
+
+    // Fallback lookup if id was composite (e.g. from-to)
+    if (!updatedEdge && req.body.from && req.body.to) {
+      updatedEdge = await Edge.findOneAndUpdate(
+        {
+          $or: [
+            { from: req.body.from, to: req.body.to },
+            { from: req.body.to, to: req.body.from },
+          ],
+        },
+        req.body,
+        { new: true, runValidators: true }
+      );
+    }
 
     if (!updatedEdge) {
       return res.status(404).json({
         success: false,
-        message: `Edge with id '${id}' not found`,
+        message: `Edge '${id}' not found`,
       });
     }
 
@@ -157,16 +178,33 @@ export const updateEdge = async (req, res) => {
   }
 };
 
-// Delete Edge by MongoDB _id
+// Delete Edge by MongoDB _id or connection endpoints
 export const deleteEdge = async (req, res) => {
   try {
     const { id } = req.params;
-    const deletedEdge = await Edge.findByIdAndDelete(id);
+    let deletedEdge = null;
+
+    if (id && /^[0-9a-fA-F]{24}$/.test(id)) {
+      deletedEdge = await Edge.findByIdAndDelete(id);
+    }
+
+    // Fallback: If id is in 'from_to' or 'from-to' format
+    if (!deletedEdge && id && (id.includes('_') || id.includes('-'))) {
+      const parts = id.includes('_') ? id.split('_') : id.split('-');
+      if (parts.length === 2) {
+        deletedEdge = await Edge.findOneAndDelete({
+          $or: [
+            { from: parts[0], to: parts[1] },
+            { from: parts[1], to: parts[0] },
+          ],
+        });
+      }
+    }
 
     if (!deletedEdge) {
       return res.status(404).json({
         success: false,
-        message: `Edge with id '${id}' not found`,
+        message: `Edge '${id}' not found`,
       });
     }
 

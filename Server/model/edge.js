@@ -16,10 +16,6 @@ const edgeSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    bidirectional: {
-      type: Boolean,
-      default: true,
-    },
     floor: {
       type: String,
       ref: 'Floor',

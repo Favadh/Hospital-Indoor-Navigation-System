@@ -23,12 +23,11 @@ export const findShortestPath = (startName, destinationName, nodesList, edgesLis
   nodeMap.forEach((_, name) => graph.set(name, []));
 
   edgesList.forEach((edge) => {
-    const { from, to, weight, bidirectional = true } = edge;
+    const { from, to, weight } = edge;
     if (graph.has(from) && graph.has(to)) {
-      graph.get(from).push({ node: to, weight: weight || 1 });
-      if (bidirectional) {
-        graph.get(to).push({ node: from, weight: weight || 1 });
-      }
+      const edgeWeight = Number(weight) || 1;
+      graph.get(from).push({ node: to, weight: edgeWeight });
+      graph.get(to).push({ node: from, weight: edgeWeight });
     }
   });
 

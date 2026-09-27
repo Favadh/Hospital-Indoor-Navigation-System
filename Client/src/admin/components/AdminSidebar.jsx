@@ -110,7 +110,7 @@ export default function AdminSidebar({
             <Building2 size={16} />
             <span>Patient Home</span>
           </Link>
-          <Link to="/map" className="sidebar-link-btn" title="Open 3D Live Map">
+          <Link to="/map?mode=admin" className="sidebar-link-btn" title="Open 3D Live Map">
             <Compass size={16} />
             <span>3D Live Map</span>
             <ExternalLink size={13} className="external-icon" />

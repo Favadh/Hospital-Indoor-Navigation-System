@@ -31,7 +31,7 @@ export default function AdminLogin() {
       try {
         const res = await api.get('/api/admins/profile');
         if (res.data?.success && res.data?.data) {
-          navigate('/admin/dashboard', { replace: true });
+          navigate('/admin/dashboard?tab=dashboard', { replace: true });
         }
       } catch (err) {
         localStorage.removeItem('token');
@@ -66,7 +66,7 @@ export default function AdminLogin() {
           localStorage.setItem('medinav_admin_user', JSON.stringify(adminData));
         }
         setIsLoading(false);
-        navigate('/admin/dashboard');
+        navigate('/admin/dashboard?tab=dashboard', { replace: true });
       } else {
         setIsLoading(false);
         setError('Login failed: Invalid server response');

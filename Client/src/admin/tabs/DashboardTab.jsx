@@ -48,7 +48,7 @@ export default function DashboardTab({
             <Crosshair size={17} />
             <span>Launch Point Inspector</span>
           </button>
-          <Link to="/map" className="action-btn-secondary">
+          <Link to="/map?mode=admin" className="action-btn-secondary">
             <Compass size={17} />
             <span>Open 3D Map</span>
           </Link>

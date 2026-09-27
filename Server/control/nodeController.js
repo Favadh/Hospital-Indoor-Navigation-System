@@ -1,4 +1,5 @@
 import Node from '../model/node.js';
+import Edge from '../model/edge.js';
 
 // Create a new Node (Supports single object or bulk array)
 export const createNode = async (req, res) => {
@@ -100,19 +101,30 @@ export const getNodeById = async (req, res) => {
   }
 };
 
-// Update Node by MongoDB _id
+// Update Node by MongoDB _id or name
 export const updateNode = async (req, res) => {
   try {
     const { id } = req.params;
-    const updatedNode = await Node.findByIdAndUpdate(id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    let updatedNode = null;
+
+    if (id && /^[0-9a-fA-F]{24}$/.test(id)) {
+      updatedNode = await Node.findByIdAndUpdate(id, req.body, {
+        new: true,
+        runValidators: true,
+      });
+    }
+
+    if (!updatedNode && id) {
+      updatedNode = await Node.findOneAndUpdate({ name: id }, req.body, {
+        new: true,
+        runValidators: true,
+      });
+    }
 
     if (!updatedNode) {
       return res.status(404).json({
         success: false,
-        message: `Node with id '${id}' not found`,
+        message: `Node '${id}' not found`,
       });
     }
 
@@ -130,16 +142,24 @@ export const updateNode = async (req, res) => {
   }
 };
 
-// Delete Node by MongoDB _id
+// Delete Node by MongoDB _id or name
 export const deleteNode = async (req, res) => {
   try {
     const { id } = req.params;
-    const deletedNode = await Node.findByIdAndDelete(id);
+    let deletedNode = null;
+
+    if (id && /^[0-9a-fA-F]{24}$/.test(id)) {
+      deletedNode = await Node.findByIdAndDelete(id);
+    }
+
+    if (!deletedNode && id) {
+      deletedNode = await Node.findOneAndDelete({ name: id });
+    }
 
     if (!deletedNode) {
       return res.status(404).json({
         success: false,
-        message: `Node with id '${id}' not found`,
+        message: `Node '${id}' not found`,
       });
     }
 
@@ -152,6 +172,116 @@ export const deleteNode = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Error deleting node',
+      error: error.message,
+    });
+  }
+};
+
+// Synchronize an entire floor blueprint graph (nodes and edges) in one atomic batch
+export const syncGraph = async (req, res) => {
+  try {
+    const { floor, nodes = [], edges = [] } = req.body;
+
+    if (!floor) {
+      return res.status(400).json({
+        success: false,
+        message: 'Floor level is required for graph synchronization',
+      });
+    }
+
+    const floorStr = String(floor);
+
+    // Normalize floor query to catch both string and numeric aliases
+    const floorAliases = [floorStr];
+    if (floorStr === '0' || floorStr.toLowerCase() === 'ground') {
+      floorAliases.push('0', 'ground', 'Ground Floor');
+    }
+    if (floorStr === '1' || floorStr.toLowerCase() === 'first') {
+      floorAliases.push('1', 'first', 'First Floor');
+    }
+
+    // 1. Clean existing nodes and edges on this floor
+    await Node.deleteMany({ floor: { $in: floorAliases } });
+    await Edge.deleteMany({ floor: { $in: floorAliases } });
+
+    // 2. Prepare validated nodes
+    const preparedNodes = nodes.map((n) => ({
+      name: String(n.name).trim(),
+      type: n.type || 'room',
+      x: Math.round(Number(n.x) || 0),
+      y: Math.round(Number(n.y) || 0),
+      floor: String(n.floor || floorStr),
+    }));
+
+    // Deduplicate node names on this floor
+    const uniqueNodes = [];
+    const seenNodeNames = new Set();
+    for (const nodeItem of preparedNodes) {
+      if (nodeItem.name && !seenNodeNames.has(nodeItem.name)) {
+        seenNodeNames.add(nodeItem.name);
+        uniqueNodes.push(nodeItem);
+      }
+    }
+
+    const insertedNodes = uniqueNodes.length > 0 ? await Node.insertMany(uniqueNodes) : [];
+
+    // Map for fast lookup of node coordinates
+    const nodeCoordMap = new Map();
+    insertedNodes.forEach((n) => nodeCoordMap.set(n.name, n));
+
+    // 3. Prepare validated edges
+    const preparedEdges = [];
+    const seenEdges = new Set();
+
+    for (const e of edges) {
+      const from = String(e.from).trim();
+      const to = String(e.to).trim();
+      if (!from || !to || from === to) continue;
+      // Skip if either endpoint node does not exist
+      if (!seenNodeNames.has(from) || !seenNodeNames.has(to)) continue;
+
+      const edgeKey = from < to ? `${from}_${to}` : `${to}_${from}`;
+      if (seenEdges.has(edgeKey)) continue;
+      seenEdges.add(edgeKey);
+
+      let weight = Number(e.weight || e.distance);
+      if (!weight || isNaN(weight) || weight <= 0) {
+        const n1 = nodeCoordMap.get(from);
+        const n2 = nodeCoordMap.get(to);
+        if (n1 && n2) {
+          weight = Math.max(1, Math.round(Math.hypot(n2.x - n1.x, n2.y - n1.y)));
+        } else {
+          weight = 10;
+        }
+      }
+
+      preparedEdges.push({
+        from,
+        to,
+        weight,
+        floor: String(e.floor || floorStr),
+      });
+    }
+
+    const insertedEdges = preparedEdges.length > 0 ? await Edge.insertMany(preparedEdges) : [];
+
+    return res.status(200).json({
+      success: true,
+      message: `Blueprint graph saved successfully (${insertedNodes.length} nodes, ${insertedEdges.length} edges)`,
+      count: {
+        nodes: insertedNodes.length,
+        edges: insertedEdges.length,
+      },
+      data: {
+        nodes: insertedNodes,
+        edges: insertedEdges,
+      },
+    });
+  } catch (error) {
+    console.error('syncGraph error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error saving blueprint graph',
       error: error.message,
     });
   }

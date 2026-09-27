@@ -47,8 +47,11 @@ function getNodeBadgeMeta(name, type) {
   if (n.includes('waiting')) {
     return { icon: 'chair', color: '#FABC04' };
   }
+  if (type === 'junction' || n.includes('junction') || n.includes('hallway') || n.includes('corridor')) {
+    return { icon: 'alt_route', color: '#00d2d3' };
+  }
   if (type === 'entrance' || n.includes('entrance') || n.includes('gate') || n.includes('exit')) {
-    return { icon: 'login', color: '#4285F4' };
+    return { icon: 'login', color: '#00ff88' };
   }
 
   return { icon: 'room', color: '#4285F4' };
@@ -61,8 +64,10 @@ function getNodeBadgeMeta(name, type) {
  * - Fixed screen-space size (no perspective distortion / distance factor) for constant crystal clarity.
  */
 export default function DepartmentLabels({ nodes }) {
-  // Only show labels for rooms and entrances, not corridor junctions
-  const labelNodes = (nodes || []).filter((n) => n.type === 'room' || n.type === 'entrance');
+  // Do not display junction or corridor nodes on the 3D map
+  const labelNodes = (nodes || []).filter(
+    (n) => n.type !== 'junction' && n.type !== 'corridor' && !n.name?.toLowerCase().includes('junction')
+  );
 
   return (
     <group>

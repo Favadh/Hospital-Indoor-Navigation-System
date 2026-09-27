@@ -11,6 +11,7 @@ const nodeSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
+      enum: ['room', 'entrance', 'junction'],
       trim: true,
     },
     x: {

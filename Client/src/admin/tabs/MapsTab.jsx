@@ -20,9 +20,9 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import api from '../../utils/axios';
-import PointPickerInspector from '../PointPickerInspector';
+import GraphEditor from '../GraphEditor';
 
-export default function MapsTab({ onMapsCountChange, showToast, nodes = [] }) {
+export default function MapsTab({ onMapsCountChange, showToast, nodes = [], onNodesChange }) {
   const [maps, setMaps] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -1135,11 +1135,12 @@ export default function MapsTab({ onMapsCountChange, showToast, nodes = [] }) {
       {/* 2D POINT PICKER INSPECTOR / GRAPH EDITOR */}
       {/* ============================================================= */}
       {inspectorMap && (
-        <PointPickerInspector
+        <GraphEditor
           onClose={() => setInspectorMap(null)}
           map={inspectorMap}
           nodes={nodes}
           edges={[]}
+          onNodesChange={onNodesChange}
         />
       )}
     </div>

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Check, AlertCircle } from 'lucide-react';
 import AdminSidebar from './components/AdminSidebar';
 import DashboardTab from './tabs/DashboardTab';
 import AdminsTab from './tabs/AdminsTab';
 import MapsTab from './tabs/MapsTab';
-import PointPickerInspector from './PointPickerInspector';
+import GraphEditor from './GraphEditor';
 import api from '../utils/axios';
 import './AdminPage.css';
 
@@ -60,6 +60,7 @@ const INITIAL_FALLBACK_ADMINS = [
 
 export default function AdminPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [currentAdminUser, setCurrentAdminUser] = useState(() => {
     try {
@@ -73,8 +74,18 @@ export default function AdminPage() {
   // Current user permissions
   const isSuperAdmin = currentAdminUser?.role === 'Super Admin';
 
-  // Active Tab: 'dashboard' | 'admins' | 'maps'
-  const [activeTab, setActiveTab] = useState('dashboard');
+  // Active Tab: 'dashboard' | 'admins' | 'maps' linked to URL searchParams
+  const tabParam = searchParams.get('tab');
+  const validTabs = ['dashboard', 'admins', 'maps'];
+  const activeTab = validTabs.includes(tabParam) ? tabParam : 'dashboard';
+
+  const setActiveTab = useCallback(
+    (newTab) => {
+      setSearchParams({ tab: newTab });
+    },
+    [setSearchParams]
+  );
+
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Admins CRUD Data State
@@ -160,6 +171,25 @@ export default function AdminPage() {
     fetchNodes();
   }, [fetchAdmins, fetchNodes]);
 
+  // Ensure browser back button is trapped within Admin Dashboard when authenticated
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      window.history.pushState({ adminSession: true }, '', window.location.href);
+    }
+
+    const handlePopState = () => {
+      const currentToken = localStorage.getItem('token');
+      if (currentToken && !window.location.pathname.startsWith('/admin')) {
+        window.history.pushState({ adminSession: true }, '', '/admin/dashboard?tab=dashboard');
+        navigate('/admin/dashboard?tab=dashboard', { replace: true });
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [navigate]);
+
   // Handle Logout
   const handleLogout = async () => {
     try {
@@ -175,7 +205,7 @@ export default function AdminPage() {
 
     localStorage.removeItem('token');
     localStorage.removeItem('medinav_admin_user');
-    navigate('/admin');
+    navigate('/admin', { replace: true });
   };
 
   return (
@@ -241,16 +271,18 @@ export default function AdminPage() {
               onMapsCountChange={(count) => setMapsCount(count)}
               showToast={showToast}
               nodes={nodes}
+              onNodesChange={fetchNodes}
             />
           )}
         </main>
 
-        {/* 2D Point Picker Inspector Modal */}
+        {/* 2D Point Picker Inspector / Graph Editor Modal */}
         {showInspector && (
-          <PointPickerInspector
+          <GraphEditor
             onClose={() => setShowInspector(false)}
             nodes={nodes}
             edges={[]}
+            onNodesChange={fetchNodes}
           />
         )}
       </div>
