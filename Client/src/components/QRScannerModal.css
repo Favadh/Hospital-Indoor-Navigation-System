@@ -433,9 +433,16 @@
   gap: 8px;
 }
 
-.qr-btn-start-nav:hover {
+.qr-btn-start-nav:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 6px 24px rgba(0, 255, 136, 0.6);
+}
+
+.qr-btn-start-nav:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .qr-btn-back {

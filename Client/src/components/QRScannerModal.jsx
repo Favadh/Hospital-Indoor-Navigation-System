@@ -153,11 +153,8 @@ export default function QRScannerModal({
     // Stop live camera feed
     stopCamera();
 
-    // Default destination: first room that is different from start
-    const defaultDest =
-      destinationOptions.find((n) => n.name !== locationName)?.name ||
-      'Pharmacy';
-    setSelectedDest(defaultDest);
+    // Destination left empty for explicit user selection
+    setSelectedDest('');
 
     // Advance immediately to Step 2
     setStep(2);
@@ -258,9 +255,7 @@ export default function QRScannerModal({
     if (isOpen) {
       if (initialStart) {
         setCurrentStart(initialStart);
-        const defaultDest =
-          destinationOptions.find((n) => n.name !== initialStart)?.name || 'Pharmacy';
-        setSelectedDest(defaultDest);
+        setSelectedDest('');
         setStep(2);
       } else {
         setStep(1);
@@ -403,9 +398,12 @@ export default function QRScannerModal({
               </label>
               <select
                 className="qr-dest-dropdown"
-                value={selectedDest}
+                value={selectedDest || ''}
                 onChange={(e) => setSelectedDest(e.target.value)}
               >
+                <option value="" disabled>
+                  Choose destination...
+                </option>
                 {destinationOptions.map((n, idx) => (
                   <option key={n._id || n.name || idx} value={n.name}>
                     {n.name} {n.type ? `(${n.type})` : ''}
@@ -450,6 +448,7 @@ export default function QRScannerModal({
               <button
                 type="button"
                 className="qr-btn-start-nav"
+                disabled={!selectedDest}
                 onClick={() => handleConfirmNavigation(selectedDest)}
               >
                 <span>Start 3D Navigation</span>

@@ -175,6 +175,16 @@ export default function Map() {
           const queryStart = searchParams.get('start') || searchParams.get('from') || searchParams.get('location');
           const queryDest = searchParams.get('destination') || searchParams.get('dest');
 
+          // Explicitly find the Main Entrance node as default arrow marker position
+          const mainEntranceNode =
+            fetchedNodes.find(
+              (n) =>
+                n.name.toLowerCase().includes('main entrance') ||
+                n.name.toLowerCase() === 'main entrance'
+            ) ||
+            fetchedNodes.find((n) => n.type === 'entrance') ||
+            fetchedNodes[0];
+
           if (queryStart && !queryDest) {
             // URL opened from QR Code at an Entrance -> Open destination picker modal directly
             const matchedNode = fetchedNodes.find(
@@ -188,7 +198,7 @@ export default function Map() {
             setScannerInitialStart(resolvedStartName);
             setShowScannerModal(true);
 
-            const startNode = matchedNode || fetchedNodes[0];
+            const startNode = matchedNode || mainEntranceNode;
             let startX = 0;
             let startZ = 0;
             if (startNode) {
@@ -201,23 +211,15 @@ export default function Map() {
             pdrEngine.start(startX, startZ);
             sensorManager.start().catch(() => {});
           } else {
-            let initialStart = queryStart || '';
-            let initialDest = queryDest || '';
-
-            if (!initialStart) {
-              const firstEntrance = fetchedNodes.find((n) => n.type === 'entrance');
-              if (firstEntrance) initialStart = firstEntrance.name;
-            }
-
-            if (!initialDest) {
-              const firstRoom = fetchedNodes.find((n) => n.type === 'room');
-              if (firstRoom) initialDest = firstRoom.name;
-            }
+            const initialStart = queryStart || '';
+            const initialDest = queryDest || '';
 
             setStartName(initialStart);
             setDestName(initialDest);
 
-            const startNode = fetchedNodes.find((n) => n.name === initialStart) || fetchedNodes[0];
+            const startNode = initialStart
+              ? fetchedNodes.find((n) => n.name === initialStart)
+              : mainEntranceNode;
             let startX = 0;
             let startZ = 0;
             if (startNode) {
@@ -227,6 +229,7 @@ export default function Map() {
             }
 
             setLiveUserPos([startX, startZ]);
+            setLiveHeading(-Math.PI / 2);
             pdrEngine.start(startX, startZ);
             sensorManager.start().catch(() => {});
           }
@@ -543,8 +546,8 @@ export default function Map() {
           CELEBRATORY ARRIVAL MODAL
       ───────────────────────────────────────────────────────────── */}
       {!isAdminView && showArrivalModal && (
-        <div className="arrival-modal-overlay" onClick={() => setShowArrivalModal(false)}>
-          <div className="arrival-modal-content animate-pop-in" onClick={(e) => e.stopPropagation()}>
+        <div className="arrival-modal-overlay">
+          <div className="arrival-modal-content animate-pop-in">
             <div className="arrival-icon-wrapper">
               <span className="arrival-trophy-icon">🎉</span>
               <div className="arrival-pulse-ring" />

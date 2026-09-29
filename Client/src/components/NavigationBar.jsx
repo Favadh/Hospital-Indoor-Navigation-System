@@ -90,11 +90,14 @@ export default function NavigationBar({
           <div className="gmaps-search-bar">
             <Target size={18} color="#00ff88" className="gmaps-input-pin gmaps-pin-start" />
             <select
-              value={startName}
+              value={startName || ''}
               onChange={(e) => onStartChange(e.target.value)}
               className="gmaps-bar-select"
               aria-label="Start Location"
             >
+              <option value="" disabled>
+                Choose start location...
+              </option>
               {selectableStartNodes.map((n, idx) => (
                 <option key={n._id || n.name || idx} value={n.name}>
                   {n.name}
