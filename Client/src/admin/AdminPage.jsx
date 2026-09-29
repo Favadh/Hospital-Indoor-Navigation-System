@@ -241,7 +241,6 @@ export default function AdminPage() {
             <DashboardTab
               nodes={nodes}
               adminsList={adminsList}
-              onOpenInspector={() => setShowInspector(true)}
               onNavigateToAdmins={() => setActiveTab('admins')}
               onNavigateToMaps={() => setActiveTab('maps')}
               onOpenAddAdminModal={() => {

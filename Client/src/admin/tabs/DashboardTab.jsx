@@ -1,5 +1,4 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import {
   Layers,
   MapPin,
@@ -7,14 +6,12 @@ import {
   Users,
   Activity,
   CheckCircle2,
-  Crosshair,
   UserPlus,
 } from 'lucide-react';
 
 export default function DashboardTab({
   nodes = [],
   adminsList = [],
-  onOpenInspector,
   onNavigateToAdmins,
   onNavigateToMaps,
   onOpenAddAdminModal,
@@ -32,26 +29,7 @@ export default function DashboardTab({
       {/* Welcome & Top Banner */}
       <div className="pane-header-banner">
         <div className="banner-text">
-          <div className="status-pill-live">
-            <span className="live-dot"></span> System Operational • Database Connected
-          </div>
-          <h1 className="pane-title">Hospital Navigation Dashboard</h1>
-          <p className="pane-subtitle">
-            Real-time overview of hospital spatial infrastructure, shortest-path Dijkstra graph, and system administrators.
-          </p>
-        </div>
-        <div className="banner-actions">
-          <button
-            className="action-btn-primary"
-            onClick={onOpenInspector}
-          >
-            <Crosshair size={17} />
-            <span>Launch Point Inspector</span>
-          </button>
-          <Link to="/map?mode=admin" className="action-btn-secondary">
-            <Compass size={17} />
-            <span>Open 3D Map</span>
-          </Link>
+          <h1 className="pane-title">Admin Dashboard</h1>
         </div>
       </div>
 
@@ -184,26 +162,6 @@ export default function DashboardTab({
                 <span>MongoDB Admin User Store: <strong>Synchronized</strong></span>
               </div>
             </div>
-          </div>
-
-          {/* Quick Tools Launch Card */}
-          <div className="dash-card quick-tools-card">
-            <div className="dash-card-header">
-              <div className="card-header-title">
-                <Crosshair size={18} color="#00ff88" />
-                <h3>Coordinate Calibration Tool</h3>
-              </div>
-            </div>
-            <p className="card-description">
-              Click anywhere on the hospital 2D blueprint to inspect, pick, and copy exact SVG coordinates for room doors, beacons, and navigation waypoints.
-            </p>
-            <button
-              className="action-btn-primary full-width"
-              onClick={onOpenInspector}
-            >
-              <Crosshair size={18} />
-              <span>Launch 2D Point & Click Inspector</span>
-            </button>
           </div>
         </div>
 

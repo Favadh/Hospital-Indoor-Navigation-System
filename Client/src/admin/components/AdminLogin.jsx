@@ -6,8 +6,8 @@ import {
   KeyRound,
   Eye,
   EyeOff,
-  Sparkles,
   ArrowRight,
+  ArrowLeft,
 } from 'lucide-react';
 import api from '../../utils/axios';
 import '../AdminPage.css';
@@ -147,13 +147,6 @@ export default function AdminLogin() {
               </div>
             </div>
 
-            <div className="admin-hint-box">
-              <Sparkles size={14} color="#00ff88" />
-              <span>
-                Demo Credentials: <code>admin</code> / <code>admin123</code>
-              </span>
-            </div>
-
             <button
               type="submit"
               className="admin-btn-submit"
@@ -171,8 +164,9 @@ export default function AdminLogin() {
           </form>
 
           <div className="admin-card-footer">
-            <Link to="/" className="admin-back-link">
-              ← Return to Home Page
+            <Link to="/" className="admin-btn-back-home">
+              <ArrowLeft size={16} />
+              <span>Return to Home Page</span>
             </Link>
           </div>
         </div>

@@ -67,7 +67,7 @@ export default function HomePage() {
       {/* ===================================================================== */}
       <section className="hero-section">
         <div className="hero-badge">
-          <Sparkles size={14} color="#00ff88" style={{ marginRight: '6px' }} /> Smart 3D Indoor Wayfinding System
+           Smart 3D Indoor Wayfinding System
         </div>
 
         <h1 className="hero-title">
@@ -75,7 +75,7 @@ export default function HomePage() {
         </h1>
 
         <p className="hero-subtitle">
-          Scan QR codes at hospital entrances or kiosks to immediately load turn-by-turn 3D vector paths directly to your doctor, clinic, or emergency ward.
+          Scan QR codes at hospital entrances to get your destination navigation path.
         </p>
 
         <div className="hero-actions">

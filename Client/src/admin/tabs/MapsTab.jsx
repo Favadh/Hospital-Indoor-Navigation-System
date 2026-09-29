@@ -483,10 +483,6 @@ export default function MapsTab({ onMapsCountChange, showToast, nodes = [], onNo
       {/* Header Banner */}
       <div className="pane-header-banner">
         <div className="banner-text">
-          <div className="banner-badge">
-            <Sparkles size={14} color="#00ff88" />
-            <span>Spatial Engine & Blueprints</span>
-          </div>
           <h1 className="pane-title">Hospital Maps & Blueprints</h1>
           <p className="pane-subtitle">
             Manage vector floor plans, SVG dimension bounds, and interactive 2D/3D navigation layouts.

@@ -287,9 +287,6 @@ export default function AdminsTab({
       <div className="pane-header-banner">
         <div className="banner-text">
           <h1 className="pane-title">Administrator Management</h1>
-          <p className="pane-subtitle">
-            MongoDB user persistence with role authorization, dynamic random avatars, and live active session tracking.
-          </p>
         </div>
         <div className="banner-actions">
           <button

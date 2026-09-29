@@ -5,7 +5,6 @@ import {
   LayoutDashboard,
   Users,
   Map as MapIcon,
-  Building2,
   Compass,
   ExternalLink,
   User,
@@ -106,10 +105,6 @@ export default function AdminSidebar({
         {/* Quick Links Section */}
         <div className="sidebar-quick-section">
           <div className="sidebar-section-title">Hospital Navigation</div>
-          <Link to="/" className="sidebar-link-btn" title="Go to Patient Home">
-            <Building2 size={16} />
-            <span>Patient Home</span>
-          </Link>
           <Link to="/map?mode=admin" className="sidebar-link-btn" title="Open 3D Live Map">
             <Compass size={16} />
             <span>3D Live Map</span>

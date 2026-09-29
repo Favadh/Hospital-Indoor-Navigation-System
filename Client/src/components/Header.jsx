@@ -10,7 +10,6 @@ export default function Header() {
     <header className="floating-header">
       {/* Brand Logo & Name */}
       <Link to="/" className="floating-brand-link">
-        <div className="floating-brand-logo">🏥</div>
         <div className="floating-brand-name">
           Medi<span style={{ color: '#00ff88' }}>Nav</span>
         </div>
